@@ -31,3 +31,11 @@ Heimdall is a development implementation, not an independently audited or accred
 ## Before operational use
 
 Use the physical-device checks in `TESTING.md`, independent application/device security review, up-to-date licensed cartography, a deployment/signing policy, and an explicit data handling and retention policy. This build does not claim TAK interoperability, validated navigation, assured GNSS accuracy, or military symbology compliance.
+
+## Repository hygiene
+
+The source does not require API keys, signing private keys, or device passcodes. Runtime journals and media live in the iPhone/simulator's private app container, outside this repository. The bundled maps use public source data.
+
+Keep operational reports, coordinates, media, and restricted map packs out of Git, including test fixtures and screenshots. If app data must be copied into the workspace for local debugging, use the ignored root `LocalData/` directory. `.gitignore` also excludes environment files, signing keys, app-container exports, test results, archives, and journals. Ignore rules do not protect already tracked files or detect secrets pasted into source code.
+
+Git commits also contain author and committer identities. Use a [GitHub noreply email](https://docs.github.com/en/account-and-profile/how-tos/email-preferences/setting-your-commit-email-address) if you do not want a personal or work email published. Changing the email for future commits does not change existing history.

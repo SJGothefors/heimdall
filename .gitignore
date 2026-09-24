@@ -7,3 +7,26 @@ xcuserdata/
 .venv/
 __pycache__/
 
+# Local credentials and Apple signing material
+.env
+.env.*
+!.env.example
+!.env.template
+*.p8
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+
+# App containers, test captures, and distribution exports
+*.xcappdata/
+*.xcresult/
+*.xcarchive/
+*.ipa
+*.dSYM/
+
+# Keep any manually copied operational data under this local-only directory.
+/LocalData/
+journal.json
