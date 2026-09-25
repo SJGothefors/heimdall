@@ -129,7 +129,7 @@ import Foundation
         coverageLayout["symbol-placement"] = "line"
         coverageLayout["text-size"] = 11
         add("coverage-labels", "symbol", "coverage", labelPaint, layout: coverageLayout)
-        for (layer, color) in [("BLUE", "#5caeff"), ("RED", "#ff7079"), ("TAC", "#bfdb8c"), ("OWN", "#ffffff")] {
+        for (layer, color) in [("BLUE", "#5caeff"), ("RED", "#ff7079"), ("TAC", "#bfdb8c"), ("OWN", "#168bff")] {
             let filter: [Any] = ["==", ["get", "layer"], layer]
             add(
                 "area-" + layer, "fill", "objects", ["fill-color": color, "fill-opacity": 0.16],
@@ -137,15 +137,27 @@ import Foundation
             add(
                 "line-" + layer, "line", "objects", ["line-color": color, "line-width": 3],
                 filter: ["all", filter, ["!=", ["geometry-type"], "Point"]])
+            if layer == "OWN" {
+                add(
+                    "own-position-halo", "circle", "objects",
+                    ["circle-color": color, "circle-radius": 17, "circle-opacity": 0.25], filter: filter)
+                add(
+                    "own-position-shadow", "circle", "objects",
+                    ["circle-color": "#0c1112", "circle-radius": 11, "circle-opacity": 0.6], filter: filter)
+            }
             add(
                 "point-" + layer, "circle", "objects",
                 [
-                    "circle-color": color, "circle-radius": layer == "OWN" ? 6 : 7, "circle-stroke-color": "#0c1112",
+                    "circle-color": color, "circle-radius": 7,
+                    "circle-stroke-color": layer == "OWN" ? "#ffffff" : "#0c1112",
                     "circle-stroke-width": 2,
                 ], filter: ["all", filter, ["==", ["geometry-type"], "Point"]])
             var layout = labelLayout
             layout["text-offset"] = [0, 1.5]
             layout["text-size"] = 12
+            if layer == "OWN" {
+                layout["text-allow-overlap"] = true
+            }
             add(
                 "label-" + layer, "symbol", "objects",
                 ["text-color": color, "text-halo-color": "#0c1112", "text-halo-width": 2], filter: filter,

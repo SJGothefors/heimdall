@@ -52,6 +52,41 @@ import XCTest
         XCTAssertEqual(store.reports.first?.stalle, "Legacy test")
         XCTAssertNil(store.reports.first?.recording)
         XCTAssertNil(store.ownPosition)
+        XCTAssertEqual(store.callsign, "")
+    }
+
+    func testCallsignPersistsWithoutChangingFieldData() throws {
+        let files = try files()
+        let store = LocalStore(files: files)
+        XCTAssertThrowsError(try store.setCallsign("TEST 21"))
+        try store.load()
+        try store.setCallsign("  ÖRN 21  ")
+        let position = PositionSnapshot(
+            coordinate: Coordinate(latitude: 57.6348, longitude: 18.2948), source: .manual, timestamp: .now)
+        try store.setOwnPosition(position)
+        var report = SevenSReport()
+        report.stalle = "Callsign persistence test"
+        try store.saveReport(report)
+        let annotation = MapAnnotation(
+            layer: .blue, kind: .point, title: "Test point", coordinates: [position.coordinate])
+        try store.save(annotation)
+
+        let restored = LocalStore(files: files)
+        try restored.load()
+        XCTAssertEqual(restored.callsign, "ÖRN 21")
+        let beforeInvalidEdit = try Data(contentsOf: files.journalURL)
+        XCTAssertThrowsError(try restored.setCallsign(String(repeating: "X", count: 25)))
+        XCTAssertThrowsError(try restored.setCallsign("TEST\n21"))
+        XCTAssertEqual(try Data(contentsOf: files.journalURL), beforeInvalidEdit)
+        XCTAssertEqual(restored.callsign, "ÖRN 21")
+
+        try restored.setCallsign("")
+        let cleared = LocalStore(files: files)
+        try cleared.load()
+        XCTAssertEqual(cleared.callsign, "")
+        XCTAssertEqual(cleared.ownPosition, position)
+        XCTAssertEqual(cleared.reports, [report])
+        XCTAssertEqual(cleared.annotations, [annotation])
     }
     func testManualPositionAndVoiceReportPersistAndDeleteAudio() throws {
         let files = try files()

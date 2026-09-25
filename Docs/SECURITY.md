@@ -16,6 +16,7 @@ Heimdall is a development implementation, not an independently audited or accred
 - GPS is off by default, requested only while in use, stops on lock/background and is not retained as tracks. Manual own-position is persisted until cleared. Voice recordings retain a position snapshot; clearing the current marker does not remove historical report metadata. Old or invalid fixes are not displayed as current positions. Core Location is an OS service and may use available system location sources; Heimdall does not control the phone's radios.
 - Region ZIPs are restricted by filenames, entry types, decompressed size, valid bounds, CRC/SHA-256 and PMTiles header checks. Extraction streams bounded chunks into protected staging, rejecting traversal and symlinks. No executable package content is accepted. Existing data is not overwritten on validation failure.
 - Journal updates are written before publishing new UI state. Decode failure blocks writing and preserves the original file.
+- The operator callsign is stored in that protected, backup-excluded journal, not in UserDefaults or source code. It is used only as the local position marker's label and is not transmitted.
 
 ## Limits that matter
 

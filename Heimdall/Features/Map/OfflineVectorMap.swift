@@ -21,6 +21,7 @@ struct OfflineVectorMap: UIViewRepresentable {
     let draft: [Coordinate]
     let activeLayer: TacticalLayer
     let location: PositionSnapshot?
+    let callsign: String
     let onTap: (Coordinate) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -137,7 +138,7 @@ struct OfflineVectorMap: UIViewRepresentable {
             if let position = parent.location {
                 append(
                     [position.coordinate], kind: .point, layer: "OWN",
-                    title: position.source == .manual ? "MANUAL" : "GPS")
+                    title: parent.callsign.isEmpty ? (position.source == .manual ? "MANUAL" : "GPS") : parent.callsign)
             }
             guard
                 let data = try? JSONSerialization.data(

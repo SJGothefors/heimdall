@@ -17,4 +17,5 @@ struct FieldJournal: Codable {
     var media: [MediaItem] = []
     var reports: [SevenSReport] = []
     var ownPosition: PositionSnapshot?
+    var callsign: String?
 }

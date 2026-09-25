@@ -11,10 +11,11 @@ A native, dark-mode iPhone field notebook for **iOS 27**. SwiftUI with MapLibre 
 - A **7S notebook** with Stund, Ställe, Styrka, Slag, Sysselsättning, Symbol and Sagesman. Save incomplete drafts, reopen/edit them, read plain text over a radio, mark them sent, and delete them. The app does not transmit radio messages.
 - Photo and video capture into an app-private local vault, thumbnails, playback, and deletion. Media is not added to Photos, so Heimdall does not initiate iCloud Photos sync. Videos are limited to five minutes per clip.
 - **MGRS coordinates**, optional manual own-position marker, and opt-in foreground GPS (off by default). Recording metadata distinguishes manual positions from GPS and preserves the position timestamp. No track history.
+- **Operator callsign** in Device → Callsign, shown beside your blue GPS/manual position marker. Leave it empty to use the GPS/MANUAL label. The callsign is saved in the protected local journal.
 - Device authentication, complete file protection, backup exclusions, app-switcher shielding, and screen-recording/mirroring shielding.
 - Local ZIP import of standard Protomaps v4 PMTiles, with optional raster imagery.
 - Voice 7S drafts with playback, capture time and position metadata. Swedish/English **on-device speech-to-text**, using Apple language models prepared explicitly in Device settings before going offline. Availability depends on the device and language. Recording and manual notes do not require a model.
-- Portrait and both landscape orientations, a hamburger navigation menu, compact map controls and an adaptive media grid. Rotation preserves the active drawing and report editor.
+- Portrait and both landscape orientations, a hamburger navigation menu, coordinates alongside the top map controls, and an adaptive media grid. Bottom map buttons sit just above the home gesture area. Rotation preserves the active drawing and report editor.
 
 ## Run
 

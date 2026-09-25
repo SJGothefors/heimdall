@@ -153,6 +153,20 @@ final class HeimdallUITests: XCTestCase {
 
     func testManualPositionAndVoiceDraft() {
         let app = launch()
+        navigate("Device", in: app)
+        app.buttons["operator-callsign"].tap()
+        let callsign = app.textFields["callsign-input"]
+        XCTAssertTrue(callsign.waitForExistence(timeout: 5))
+        callsign.tap()
+        callsign.typeText("TEST 21")
+        app.buttons["save-callsign"].tap()
+        XCTAssertTrue(app.buttons["operator-callsign"].waitForExistence(timeout: 5))
+        capture("Operator callsign settings")
+        app.buttons["operator-callsign"].tap()
+        XCTAssertTrue(callsign.waitForExistence(timeout: 5))
+        XCTAssertEqual(callsign.value as? String, "TEST 21")
+        app.buttons["save-callsign"].tap()
+        navigate("Map", in: app)
         app.buttons["My position"].tap()
         app.buttons["Set my position on map"].tap()
         app.buttons["set-own-position"].tap()
@@ -160,6 +174,10 @@ final class HeimdallUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Center on my position"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Enable GPS"].exists)
         app.buttons["Center on my position"].tap()
+        capture("Own position portrait")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        capture("Own position landscape")
+        XCUIDevice.shared.orientation = .portrait
         navigate("7S reports", in: app)
         app.buttons["Record voice report"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Start recording"].waitForExistence(timeout: 5))

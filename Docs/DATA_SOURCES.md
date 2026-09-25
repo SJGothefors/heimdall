@@ -20,6 +20,21 @@ Prepared 2026-09-24 by `Scripts/prepare_maps.py`. The derived map contains clipp
 
 [NASA Blue Marble: Next Generation](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/), July 2004. Delivered by [NASA Global Imagery Browse Services](https://www.earthdata.nasa.gov/data/tools/gibs), `BlueMarble_NextGeneration`, date `2004-07-01`, `GoogleMapsCompatible_Level8`, downloaded at zoom 7. No provider logos or imagery endorsement are implied.
 
+### Detailed aerial imagery — not yet included
+
+The bundled photograph cannot resolve streets or buildings in Visby. Enlarging or sharpening it cannot add that information. The regional vector packages do not contain aerial imagery.
+
+[Lantmäteriet Ortofoto Nedladdning](https://geotorget.lantmateriet.se/dokument/projects/ortofoto-nedladdning/released/2025.02/) supplies aerial photographs; its current product documentation describes 0.16 m and 0.4 m ground resolution, depending on coverage/year. Downloads are free, but require an account, an approved access application and acceptance of the provider's conditions. Access was not available during development, so these photographs have **not** been downloaded or bundled. An OpenAerialMap catalog search for the Gotland package extent on 2026-09-25 returned elevation data only, not aerial imagery.
+
+To supply detailed Photo mode:
+
+1. Apply for **Ortofoto Nedladdning** in [Geotorget](https://geotorget.lantmateriet.se/geodataprodukter/ortofoto-nedladdning-api) and obtain access for the intended use.
+2. Download the approved Gotland/Visby imagery, retaining its acquisition date, coverage and applicable attribution/use terms. Keep credentials and source downloads outside the repository, for example under ignored `LocalData/`.
+3. Prepare georeferenced Web Mercator raster tiles in `imagery.pmtiles`, with 256-pixel PNG/JPEG/WebP tiles through zoom 18 and a total region ZIP below the app's 2 GB limit. Use smaller coverage if necessary; do not claim full-region imagery from a city-only extract.
+4. Include the imagery's SHA-256 and attribution in the region manifest, then import the ZIP using the [map package workflow](MAP_PACKS.md). Archive a previously loaded copy before loading its updated package.
+
+The application already supports local raster PMTiles. Provider access and actual aerial source data remain prerequisites for improving Photo resolution; no account or network connection is needed on the phone after a package is prepared and imported.
+
 ## Elevation
 
 [Mapzen / Tilezen terrain tiles](https://registry.opendata.aws/terrain-tiles/), Terrarium-encoded PNG tiles from the public `elevation-tiles-prod` bucket, zoom 6. Decoding: `R × 256 + G + B / 256 − 32768` meters. Resampled to a 129 × 257 grid.

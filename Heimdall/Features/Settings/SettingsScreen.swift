@@ -16,6 +16,14 @@ struct SettingsScreen: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("Operator") {
+                    NavigationLink {
+                        CallsignEditor(store: store)
+                    } label: {
+                        LabeledContent("Callsign", value: store.callsign.isEmpty ? "Not set" : store.callsign)
+                            .privacySensitive()
+                    }.accessibilityIdentifier("operator-callsign")
+                }
                 Section {
                     ForEach(maps.regions) { pack in regionRow(pack) }
                     Button("Import map package", systemImage: "square.and.arrow.down") { importing = true }.disabled(
@@ -174,4 +182,49 @@ struct SettingsScreen: View {
             }.padding(.vertical, 4).disabled(maps.isLoading)
     }
 
+}
+
+private struct CallsignEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let store: LocalStore
+    @State private var callsign: String
+    @State private var error: String?
+
+    init(store: LocalStore) {
+        self.store = store
+        _callsign = State(initialValue: store.callsign)
+    }
+
+    private var trimmedCallsign: String { callsign.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Callsign", text: $callsign)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    .submitLabel(.done).onSubmit(save)
+                    .privacySensitive().accessibilityIdentifier("callsign-input")
+            } footer: {
+                Text("Shown beside your position on the map. Up to 24 characters. Leave empty to clear.")
+            }
+            if let error { Text(error).foregroundStyle(.red) }
+        }
+        .scrollContentBackground(.hidden).background(Theme.background)
+        .navigationTitle("Callsign").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save", action: save)
+                    .disabled(!LocalStore.isValidCallsign(trimmedCallsign))
+                    .accessibilityIdentifier("save-callsign")
+            }
+        }
+    }
+
+    private func save() {
+        guard LocalStore.isValidCallsign(trimmedCallsign) else { return }
+        do {
+            try store.setCallsign(callsign)
+            dismiss()
+        } catch { self.error = error.localizedDescription }
+    }
 }

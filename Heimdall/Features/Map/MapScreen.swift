@@ -53,35 +53,13 @@ struct MapScreen: View {
     var body: some View {
         ZStack {
             if navigation.section == .map {
-                if let package = maps.package {
-                    if style == .terrain {
-                        TerrainView(
-                            package: package, photo: maps.photo, annotations: visibleAnnotations,
-                            coverage: showRegionBorders ? maps.loadedRegions : []
-                        ).id(maps.revision)
-                    } else {
-                        TimelineView(.periodic(from: .now, by: 5)) { _ in
-                            OfflineVectorMap(
-                                maps: maps, photoMode: style == .photo, showRegionBorders: showRegionBorders,
-                                viewport: $viewport,
-                                annotations: visibleAnnotations, draft: draft, activeLayer: activeLayer,
-                                location: location.currentPosition, onTap: mapTapped
-                            )
-                            .id("\(maps.revision)-\(style.rawValue)")
-                        }
-                    }
-                } else {
-                    ProgressView()
-                }
-                if style != .terrain {
-                    Image(systemName: "plus").font(.system(size: 22, weight: .light))
-                        .foregroundStyle(.white.opacity(0.8)).shadow(color: .black, radius: 2)
-                        .allowsHitTesting(false).accessibilityHidden(true)
-                }
+                mapSurface.ignoresSafeArea()
                 VStack(spacing: 8) {
                     HStack(alignment: .top) {
                         AppMenu()
-                        Spacer()
+                        Spacer(minLength: 8)
+                        coordinateBar.frame(height: 46)
+                        Spacer(minLength: 8)
                         if isLandscape {
                             HStack(spacing: 6) { mapButtons }
                         } else {
@@ -99,11 +77,13 @@ struct MapScreen: View {
                         }
                     }
                     if navigation.selectingPosition { positionBar } else if tool != nil { drawingBar } else { layerBar }
-                    coordinateBar
-                }.padding(isLandscape ? 8 : 12)
+                }
+                .padding(.horizontal, isLandscape ? 8 : 12)
+                .padding(.top, isLandscape ? 8 : 12)
+                .padding(.bottom, 2)
             }
         }
-        .background(Theme.background).clipped()
+        .background(Theme.background)
         .onGeometryChange(for: CGSize.self) {
             $0.size
         } action: { newSize in
@@ -172,6 +152,37 @@ struct MapScreen: View {
         }
     }
 
+    private var mapSurface: some View {
+        ZStack {
+            if let package = maps.package {
+                if style == .terrain {
+                    TerrainView(
+                        package: package, photo: maps.photo, annotations: visibleAnnotations,
+                        coverage: showRegionBorders ? maps.loadedRegions : []
+                    ).id(maps.revision)
+                } else {
+                    TimelineView(.periodic(from: .now, by: 5)) { _ in
+                        OfflineVectorMap(
+                            maps: maps, photoMode: style == .photo, showRegionBorders: showRegionBorders,
+                            viewport: $viewport,
+                            annotations: visibleAnnotations, draft: draft, activeLayer: activeLayer,
+                            location: location.currentPosition, callsign: store.callsign, onTap: mapTapped
+                        )
+                        .id("\(maps.revision)-\(style.rawValue)")
+                    }
+                }
+            } else {
+                ProgressView()
+            }
+            // The crosshair shares the full map bounds so it matches the camera center.
+            if style != .terrain {
+                Image(systemName: "plus").font(.system(size: 22, weight: .light))
+                    .foregroundStyle(.white.opacity(0.8)).shadow(color: .black, radius: 2)
+                    .allowsHitTesting(false).accessibilityHidden(true)
+            }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+    }
+
     @ViewBuilder private var mapButtons: some View {
         Menu {
             ForEach(MapStyle.allCases, id: \.self) { option in
@@ -194,6 +205,7 @@ struct MapScreen: View {
         PanelButton(symbol: "square.3.layers.3d", label: "Layers") { showLayers = true }
         if style != .terrain {
             Menu {
+                Text(positionStatus)
                 if let position = location.currentPosition {
                     Button("Center on my position", systemImage: "location.fill") {
                         viewport.center = position.coordinate.worldPoint
@@ -323,15 +335,14 @@ struct MapScreen: View {
     }
 
     private var coordinateBar: some View {
-        HStack(spacing: 8) {
-            Text(Coordinate(worldPoint: viewport.center).formatted)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced)).accessibilityIdentifier("map-mgrs")
-            Spacer(minLength: 2)
-            TimelineView(.periodic(from: .now, by: 5)) { _ in
-                Text(positionStatus).font(.system(size: 10)).foregroundStyle(Theme.muted)
-            }
-        }.padding(.horizontal, 10).padding(.vertical, 8).background(Theme.panel, in: RoundedRectangle(cornerRadius: 10))
+        Text(Coordinate(worldPoint: viewport.center).formatted)
+            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background(Theme.panel, in: Capsule())
+            .fixedSize()
+            .accessibilityIdentifier("map-mgrs")
             .accessibilityLabel("MGRS map center")
+            .accessibilityValue(Coordinate(worldPoint: viewport.center).formatted)
     }
     private var positionStatus: String {
         if location.isEnabled { return location.currentPosition == nil ? "GPS: no fix" : location.message }
