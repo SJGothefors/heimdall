@@ -53,7 +53,8 @@ struct MediaScreen: View {
                         }
                     }
                 }.padding(22)
-            }.background(Theme.background).navigationTitle("Media vault")
+            }.background(Theme.background).navigationTitle("Media").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarLeading) { AppMenu() } }
                 .fullScreenCover(item: $capture) { mode in
                     CameraCapture(video: mode == .video) { result in
                         capture = nil

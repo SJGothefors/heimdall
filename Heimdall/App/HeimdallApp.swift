@@ -53,7 +53,7 @@ struct AppRoot: View {
                         Task { await security.unlock(); await prepare() }
                     } label: {
                         Label("Unlock Heimdall", systemImage: "faceid").padding(.horizontal, 18).padding(.vertical, 8)
-                    }.buttonStyle(.borderedProminent).disabled(security.isAuthenticating)
+                    }.buttonStyle(PrimaryButtonStyle()).disabled(security.isAuthenticating)
                     if let message = security.message { Text(message).font(.footnote).foregroundStyle(Theme.muted).multilineTextAlignment(.center) }
                     Label("Stored only on this iPhone", systemImage: "internaldrive").font(.caption).foregroundStyle(Theme.muted)
                 }.padding(36)
@@ -82,11 +82,21 @@ struct AppRoot: View {
         guard security.isUnlocked else { return }
         do {
             if store == nil {
-                let files = try SecureFiles()
+                var root: URL?
+                #if DEBUG && targetEnvironment(simulator)
+                if ProcessInfo.processInfo.arguments.contains("--isolated-ui-tests") {
+                    root = URL.applicationSupportDirectory.appendingPathComponent("HeimdallUITests", isDirectory: true)
+                    if ProcessInfo.processInfo.arguments.contains("--reset-ui-tests"), let root {
+                        try? FileManager.default.removeItem(at: root)
+                    }
+                }
+                #endif
+                let files = try SecureFiles(root: root)
                 store = LocalStore(files: files)
                 maps = MapRepository(files: files)
             }
             try store?.load()
+            location.manualPosition = store?.ownPosition
             try await maps?.load()
             error = nil
         } catch { self.error = error.localizedDescription }

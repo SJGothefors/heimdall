@@ -23,6 +23,8 @@ def main():
                         help="Use device authentication instead of the simulator preview bypass")
     args = parser.parse_args()
 
+    run(sys.executable, "Scripts/prepare_region.py", "--all", "--check")
+
     developer_dir = Path(run("xcode-select", "-p", capture=True).strip())
     sdk_version = run("xcrun", "--sdk", "iphonesimulator", "--show-sdk-version", capture=True).strip()
     if int(sdk_version.split(".")[0]) < 27:

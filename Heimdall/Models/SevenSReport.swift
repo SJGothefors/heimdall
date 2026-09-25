@@ -12,13 +12,18 @@ struct SevenSReport: Identifiable, Codable, Equatable, Sendable {
     var sysselsattning = ""
     var symbol = ""
     var sagesman = ""
+    var recording: VoiceRecording?
+    var transcript: String?
 
     var fields: [(String, String)] {
         [("Stund", stund), ("Ställe", stalle), ("Styrka", styrka), ("Slag", slag),
          ("Sysselsättning", sysselsattning), ("Symbol", symbol), ("Sagesman", sagesman)]
     }
     var isEmpty: Bool { fields.allSatisfy { $0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
-    var isValid: Bool { !isEmpty && fields.allSatisfy { $0.1.count <= 2_000 } }
+    var isValid: Bool {
+        (!isEmpty || recording != nil) && fields.allSatisfy { $0.1.count <= 2_000 } &&
+        (recording?.isValid ?? true) && (transcript?.count ?? 0) <= 30_000
+    }
     var completedCount: Int { fields.filter { !$0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count }
     var title: String { stalle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "7S-rapport" : stalle }
     var radioText: String {

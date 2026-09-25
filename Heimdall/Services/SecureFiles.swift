@@ -10,9 +10,11 @@ struct SecureFiles: Sendable {
         try Self.createDirectory(self.root)
         try Self.createDirectory(mediaDirectory)
         try Self.createDirectory(stagingDirectory)
+        try Self.createDirectory(voiceDirectory)
     }
 
     var journalURL: URL { root.appendingPathComponent("journal.json") }
+    var voiceDirectory: URL { root.appendingPathComponent("Voice", isDirectory: true) }
     var mediaDirectory: URL { root.appendingPathComponent("Media", isDirectory: true) }
     var stagingDirectory: URL { root.appendingPathComponent("Staging", isDirectory: true) }
     var importedMapDirectory: URL { root.appendingPathComponent("ImportedMap", isDirectory: true) }

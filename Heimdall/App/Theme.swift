@@ -5,7 +5,7 @@ enum Theme {
     static let panel = Color(red: 0.083, green: 0.105, blue: 0.11)
     static let line = Color.white.opacity(0.09)
     static let accent = Color(red: 0.75, green: 0.86, blue: 0.55)
-    static let muted = Color(red: 0.56, green: 0.62, blue: 0.62)
+    static let muted = Color(red: 0.70, green: 0.75, blue: 0.75)
 }
 
 extension TacticalLayer {
@@ -40,5 +40,16 @@ struct Eyebrow: View {
     var body: some View {
         Text(text).font(.system(size: 10, weight: .semibold, design: .monospaced))
             .tracking(1.8).foregroundStyle(Theme.muted)
+    }
+}
+
+struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.subheadline.weight(.semibold))
+            .foregroundStyle(Theme.background)
+            .padding(.horizontal, 16).frame(minHeight: 44)
+            .background(isEnabled ? Theme.accent : Theme.muted, in: RoundedRectangle(cornerRadius: 12))
+            .opacity(configuration.isPressed ? 0.75 : (isEnabled ? 1 : 0.5))
     }
 }

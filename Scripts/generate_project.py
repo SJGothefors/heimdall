@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the dependency-free Xcode project using stable identifiers."""
+"""Generate the Xcode project using stable identifiers and pinned packages."""
 import hashlib
 from pathlib import Path
 
@@ -26,13 +26,24 @@ def target(name, folder, product_type, extension):
     phase = add(name+'-sources', f'{{isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = {array(sources)}; runOnlyForDeploymentPostprocessing = 0; }}')
     resource_items = []
     if name == 'Heimdall':
-        for file, typ in [('Sweden','folder'), ('PrivacyInfo.xcprivacy','text.xml'), ('Assets.xcassets','folder.assetcatalog')]:
+        for file, typ in [('Sweden','folder'), ('Maps','folder'), ('PrivacyInfo.xcprivacy','text.xml'), ('Assets.xcassets','folder.assetcatalog')]:
             ref = add(file, f'{{isa = PBXFileReference; lastKnownFileType = {typ}; path = Heimdall/Resources/{file}; sourceTree = SOURCE_ROOT; }}')
             children.append(ref)
             resource_items.append(add(file+'-build', f'{{isa = PBXBuildFile; fileRef = {ref}; }}'))
         objects[group] = f'{{isa = PBXGroup; children = {array(children)}; name = Heimdall; sourceTree = "<group>"; }}'
+    if name == 'HeimdallTests':
+        ref = add('test-fixtures', '{isa = PBXFileReference; lastKnownFileType = folder; path = HeimdallTests/Fixtures; sourceTree = SOURCE_ROOT; }')
+        resource_items.append(add('test-fixtures-build', f'{{isa = PBXBuildFile; fileRef = {ref}; }}'))
     resources = add(name+'-resources', f'{{isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = {array(resource_items)}; runOnlyForDeploymentPostprocessing = 0; }}')
-    frameworks = add(name+'-frameworks', '{isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; }')
+    products = []
+    framework_items = []
+    if name == 'Heimdall':
+        for product_name, repo, version in [('MapLibre', 'maplibre/maplibre-native-distribution', '6.31.0'), ('ZIPFoundation', 'weichsel/ZIPFoundation', '0.9.20')]:
+            package = add(product_name+'-package', f'{{isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/{repo}.git"; requirement = {{kind = exactVersion; version = {version}; }}; }}')
+            dependency = add(product_name+'-dependency', f'{{isa = XCSwiftPackageProductDependency; package = {package}; productName = {product_name}; }}')
+            products.append(dependency)
+            framework_items.append(add(product_name+'-framework-build', f'{{isa = PBXBuildFile; productRef = {dependency}; }}'))
+    frameworks = add(name+'-frameworks', f'{{isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = {array(framework_items)}; runOnlyForDeploymentPostprocessing = 0; }}')
     configs = []
     for config in ['Debug','Release']:
         values = {'PRODUCT_NAME':'"$(TARGET_NAME)"', 'PRODUCT_BUNDLE_IDENTIFIER':f'com.heimdall.local.{name.lower()}',
@@ -60,7 +71,11 @@ def target(name, folder, product_type, extension):
     if name != 'Heimdall':
         proxy = add(name+'-proxy', f'{{isa = PBXContainerItemProxy; containerPortal = {ident("project")}; proxyType = 1; remoteGlobalIDString = {ident("Heimdall-target")}; remoteInfo = Heimdall; }}')
         dependencies = [add(name+'-dependency', f'{{isa = PBXTargetDependency; target = {ident("Heimdall-target")}; targetProxy = {proxy}; }}')]
-    targetid = add(name+'-target', f'{{isa = PBXNativeTarget; buildConfigurationList = {configlist}; buildPhases = {array([phase,frameworks,resources])}; buildRules = (); dependencies = {array(dependencies)}; name = {name}; productName = {name}; productReference = {product}; productType = {quoted(product_type)}; }}')
+    phases = [phase, frameworks, resources]
+    if name == 'Heimdall':
+        check = add('map-check', r'{isa = PBXShellScriptBuildPhase; name = "Check offline maps"; buildActionMask = 2147483647; files = (); inputPaths = ("$(SRCROOT)/Scripts/check_maps.sh", "$(SRCROOT)/Heimdall/Resources/Maps"); outputPaths = (); runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = "sh \"$SRCROOT/Scripts/check_maps.sh\""; alwaysOutOfDate = 1; }')
+        phases.insert(0, check)
+    targetid = add(name+'-target', f'{{isa = PBXNativeTarget; buildConfigurationList = {configlist}; buildPhases = {array(phases)}; buildRules = (); dependencies = {array(dependencies)}; packageProductDependencies = {array(products)}; name = {name}; productName = {name}; productReference = {product}; productType = {quoted(product_type)}; }}')
     return targetid, group, product
 
 targets = [target('Heimdall','Heimdall','com.apple.product-type.application','app'),
@@ -74,7 +89,7 @@ for config in ['Debug','Release']:
               'SWIFT_COMPILATION_MODE':'singlefile' if config == 'Debug' else 'wholemodule'}
     configs.append(add('project'+config, f'{{isa = XCBuildConfiguration; buildSettings = {settings(values)}; name = {config}; }}'))
 configlist = add('project-configs', f'{{isa = XCConfigurationList; buildConfigurations = {array(configs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; }}')
-add('project', f'{{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2700; }}; buildConfigurationList = {configlist}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, sv, Base); mainGroup = {main}; productRefGroup = {products}; projectDirPath = ""; projectRoot = ""; targets = {array([t[0] for t in targets])}; }}')
+add('project', f'{{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2700; }}; buildConfigurationList = {configlist}; compatibilityVersion = "Xcode 14.0"; packageReferences = ({ident("MapLibre-package")}, {ident("ZIPFoundation-package")}); developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, sv, Base); mainGroup = {main}; productRefGroup = {products}; projectDirPath = ""; projectRoot = ""; targets = {array([t[0] for t in targets])}; }}')
 project = ROOT/'Heimdall.xcodeproj'
 project.mkdir(exist_ok=True)
 (project/'project.pbxproj').write_text('// !$*UTF8*$!\n{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n' + '\n'.join(f'{k} = {v};' for k,v in objects.items()) + f'\n}}; rootObject = {ident("project")}; }}\n')

@@ -30,3 +30,8 @@ __pycache__/
 # Keep any manually copied operational data under this local-only directory.
 /LocalData/
 journal.json
+
+# Public regional maps are prepared locally; several exceed GitHub file limits.
+/Heimdall/Resources/Maps/*.zip
+
+/Heimdall/Resources/Maps/.map-prepare-*/

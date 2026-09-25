@@ -18,7 +18,7 @@ struct AnnotationEditor: View {
                     }
                     TextField("Notes", text: $annotation.notes, axis: .vertical).lineLimit(3...6)
                 }
-                Section("Position · WGS 84") {
+                Section("Position · MGRS (WGS 84)") {
                     if let coordinate = annotation.coordinates.first { Text(coordinate.formatted).font(.system(.footnote, design: .monospaced)) }
                     LabeledContent("Geometry", value: annotation.kind.rawValue.capitalized)
                     if annotation.kind != .point { LabeledContent("Vertices", value: "\(annotation.coordinates.count)") }
@@ -50,13 +50,14 @@ struct AnnotationEditor: View {
 struct LayerSheet: View {
     let store: LocalStore
     @Binding var visible: Set<TacticalLayer>
-    @Binding var active: TacticalLayer
+    @Binding var showRegionBorders: Bool
     let select: (MapAnnotation) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
+                Section { Toggle("Loaded map borders", isOn: $showRegionBorders).accessibilityIdentifier("region-borders") }
                 ForEach(TacticalLayer.allCases) { layer in
                     Section {
                         Toggle(isOn: Binding(get: { visible.contains(layer) }, set: { if $0 { visible.insert(layer) } else { visible.remove(layer) } })) {

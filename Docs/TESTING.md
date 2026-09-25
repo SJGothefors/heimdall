@@ -1,26 +1,22 @@
 # Validation
 
-## Recorded run — 2026-09-24
+## Current validation — 2026-09-25
 
-- Xcode 27.0 (27A266a), iOS 27.0 SDK, iPhone 18 Pro simulator.
-- Debug app and test targets built successfully with Swift 6 strict concurrency.
-- Main suite: **13 passed, 1 explicitly skipped, 0 failures**. The skipped check reads device file-protection attributes, which the simulator does not expose.
-- Additional map-import lifecycle test: **1 passed**, including importing, replacing, rejecting a corrupt replacement without losing the current pack, and restoring the bundled map.
-- Responsive-layout follow-up: all **4 UI tests passed**, including portrait, landscape left/right, map modes, drawing controls, report editor and media screen. Full-screen captures are used because app-window screenshot crops can be incorrect after rotation with a separate privacy window.
-- Unsigned physical-device **Release build succeeded**, minimum OS verified as iOS 27.0. The Release executable does not contain the simulator authentication-bypass argument.
-- Screenshots are in `Screenshots/`, including portrait, landscape map modes, drawing, report editing and media.
-- Bundled map and photo hashes match `DATA_MANIFEST.json`; property lists validate and `git diff --check` passes.
-- Result bundles (ignored build artifacts): `build/Tests-Final.xcresult`, `build/MapImport.xcresult`, `build/Orientation.xcresult` and `build/Orientation-Verified.xcresult`.
+Xcode 27.0 / iOS 27.0 SDK, iPhone 18 Pro simulator, Swift 6 strict concurrency.
 
-Across the suite there are **15 distinct passing tests** and **1 physical-device-only skipped test**. Repeated orientation capture runs do not add to that distinct count. The final compact report/media layout passed the orientation test, its full-screen captures were visually inspected, and the physical-device Release build passed again.
+- Unit/integration suite: **17 passed, 1 physical-device-only skipped**. Covers independent MGRS reference values, fit-to-country bounds, legacy journal compatibility, manual-position and voice persistence/deletion, preconfigured Gotland, two-region loading/relaunch/archiving, third-region rejection and malicious ZIP inputs.
+- UI suite: **6 passed**, covering portrait and both landscape orientations, detailed map modes/drawing, annotation persistence, background locking, report lifecycle, manual position/voice capture/playback and the two-region coverage toggle. Full results are in `build/FieldFinal.xcresult`; the final button-contrast orientation check also passes in `build/LayerContrastVerified.xcresult`.
+- Unsigned physical-device **Release build succeeds** with minimum OS 27.0. The binary excludes all simulator preview/reset arguments and includes all five offline packages.
+- Each regional archive's manifest and extracted PMTiles SHA-256 matches `Scripts/regions.json`. The map preparation command and generated project are checked. `git diff --check` and property-list validation pass.
+- UI tests use a separate simulator data directory and synthetic observations. They do not reset the ordinary app's notebook. Screenshots are full-screen XCTest captures to avoid incorrect app-window crops after rotation.
 
-Camera capture, actual GNSS reception, locked-device encryption behavior, signing/distribution and real field operation were **not** tested on a physical iPhone. The acceptance checks below remain required before operational use.
+Simulator checks do **not** validate real camera/GNSS performance, Swedish/English transcription accuracy, locked-device encryption, thermal/battery behavior or operation in field conditions. Language models were not downloaded during the UI tests; the offline-unavailable path preserves the recording.
 
 ## Automated
 
 Run the shared Heimdall scheme's tests on an iOS 27 simulator. The test suite covers:
 
-- Forward/inverse Web Mercator and screen-coordinate projection.
+- Forward/inverse Web Mercator, country fitting and independently generated MGRS reference values.
 - Bundled vector, photo and elevation package availability and validation.
 - Invalid, incomplete and out-of-coverage annotations.
 - 7S save/edit/sent/delete persistence across store reloads; explicit missing-field text and limits.
@@ -47,3 +43,12 @@ Run the shared Heimdall scheme's tests on an iOS 27 simulator. The test suite co
 10. Have a separate reviewer audit the signed Release app, provisioning, data paths, imported-map trust, temporary capture lifecycle and device configuration before field use.
 
 Use synthetic observations for testing. The app deliberately does not ship sample tactical positions or fictional report content in normal use.
+
+## Added device checks for regions and voice
+
+1. Install both Swedish and English speech models using Device → Offline speech while connected. Enable airplane mode, record known phrases in each language, transcribe and compare against the recordings. Check an unsupported language/device and a missing/evicted model: keep the audio and manual editor available, with no cloud fallback.
+2. Start with Gotland, load Stockholm, archive Gotland, then load Uppland. Pan across the Stockholm/Uppland overlap at street level. Relaunch offline and confirm both remain loaded. Attempt a third region and verify that nothing is silently removed.
+3. Check all five regional extracts near their declared edges, the country overview outside them, and coverage outlines on/off in Vector, Photo and 3D. Package boundaries are rectangular data extents, not province borders.
+4. Record with GPS off/no manual fix, a current GPS fix, and an old manual position. Confirm time, source, MGRS coordinate, position age and GPS accuracy. Location metadata must never silently become the observed object's Ställe.
+5. Interrupt recording with a call, lock, background, route change and low storage; verify saved audio and duration. Kill the process mid-recording to assess partial/orphan data. Retry a failed save. Delete a report and confirm its audio file is removed.
+6. Play, pause, scrub and leave a recording screen. Cancel transcription and background while transcribing. Confirm audio stops, the privacy shield covers the UI and the app requires authentication on return.

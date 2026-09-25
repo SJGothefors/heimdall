@@ -25,11 +25,12 @@ struct Coordinate: Codable, Hashable, Sendable {
     }
 
     var formatted: String {
-        String(format: "%.5f° N  %.5f° E", latitude, longitude)
+        MGRS.string(for: self) ?? decimalDegrees
     }
+    var decimalDegrees: String { String(format: "%.5f°, %.5f°", latitude, longitude) }
 }
 
-struct MapBounds: Codable, Sendable {
+struct MapBounds: Codable, Equatable, Sendable {
     var west: Double
     var south: Double
     var east: Double

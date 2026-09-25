@@ -7,6 +7,7 @@ final class LocalStore {
     private(set) var media: [MediaItem] = []
     private(set) var reports: [SevenSReport] = []
     private(set) var isLoaded = false
+    private(set) var ownPosition: PositionSnapshot?
     let files: SecureFiles
 
     init(files: SecureFiles) { self.files = files }
@@ -21,10 +22,12 @@ final class LocalStore {
                   Set(journal.annotations.map(\.id)).count == journal.annotations.count,
                   Set(journal.media.map(\.id)).count == journal.media.count,
                   journal.reports.count <= 10_000, journal.reports.allSatisfy(\.isValid),
-                  Set(journal.reports.map(\.id)).count == journal.reports.count else { throw AppError.invalidState }
+                  Set(journal.reports.map(\.id)).count == journal.reports.count,
+                  journal.ownPosition?.isValid ?? true else { throw AppError.invalidState }
             annotations = journal.annotations
             media = journal.media
             reports = journal.reports
+            ownPosition = journal.ownPosition
         }
         try files.cleanStaging()
         isLoaded = true
@@ -32,7 +35,7 @@ final class LocalStore {
 
     private func commit(annotations: [MapAnnotation], media: [MediaItem], reports: [SevenSReport]? = nil) throws {
         guard isLoaded else { throw AppError.invalidState }
-        let journal = FieldJournal(annotations: annotations, media: media, reports: reports ?? self.reports)
+        let journal = FieldJournal(annotations: annotations, media: media, reports: reports ?? self.reports, ownPosition: ownPosition)
         try SecureFiles.write(JSONEncoder().encode(journal), to: files.journalURL)
         self.annotations = annotations
         self.media = media
@@ -70,7 +73,18 @@ final class LocalStore {
     }
 
     func deleteReport(_ id: UUID) throws {
+        if let recording = reports.first(where: { $0.id == id })?.recording {
+            let url = files.voiceDirectory.appendingPathComponent(recording.fileName)
+            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        }
         try commit(annotations: annotations, media: media, reports: reports.filter { $0.id != id })
+    }
+
+    func setOwnPosition(_ position: PositionSnapshot?) throws {
+        guard isLoaded, position?.isValid ?? true else { throw AppError.invalidState }
+        let journal = FieldJournal(annotations: annotations, media: media, reports: reports, ownPosition: position)
+        try SecureFiles.write(JSONEncoder().encode(journal), to: files.journalURL)
+        ownPosition = position
     }
 
     func deleteMedia(_ item: MediaItem) throws {

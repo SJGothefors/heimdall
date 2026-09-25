@@ -1,3 +1,13 @@
+# Regional vector maps
+
+The five regional packages are extracted from the [Protomaps daily basemap](https://docs.protomaps.com/basemaps/downloads), `https://build.protomaps.com/20260924.pmtiles`, schema 4.15.2, data timestamp **2026-09-24T04:00:00Z**. They contain MVT vector tiles through zoom 15 in standard PMTiles v3 containers.
+
+© [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). Natural Earth data is public domain. The packages are regional extracts, not proprietary Apple or Google Maps caches. Extents and extracted-file hashes are recorded in `Scripts/regions.json`. Package boundaries represent buffered rectangular coverage, not official province boundaries.
+
+[MapLibre Native](https://github.com/maplibre/maplibre-native) renders local PMTiles. [ZIPFoundation](https://github.com/weichsel/ZIPFoundation) handles bounded ZIP extraction. Versions are pinned in the Xcode project and Package.resolved. Third-party licence notices are bundled in `Resources/Maps/Notices.txt`.
+
+Noto Sans Regular glyphs (Unicode 0–511, covering Swedish and English labels) come from [Protomaps basemap assets](https://github.com/protomaps/basemaps-assets/tree/main/fonts). SIL Open Font License text is bundled in `Resources/Maps/Fonts/OFL.txt`. Additional alphabets are not currently bundled.
+
 # Bundled Sweden overview data
 
 Prepared 2026-09-24 by `Scripts/prepare_maps.py`. The derived map contains clipped/simplified vectors, a cropped Web Mercator satellite mosaic, and a sampled elevation grid. It is not endorsed by the data providers.

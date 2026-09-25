@@ -1,0 +1,102 @@
+[
+  {
+    "version": 1,
+    "id": "gotland",
+    "name": "Gotland",
+    "schema": "protomaps-v4",
+    "bounds": {
+      "west": 17.8,
+      "south": 56.8,
+      "east": 19.5,
+      "north": 58.5
+    },
+    "focus": {
+      "latitude": 57.6348,
+      "longitude": 18.2948
+    },
+    "sourceDate": "2026-09-24T04:00:00Z",
+    "attribution": "© OpenStreetMap contributors (ODbL) · Natural Earth · Protomaps",
+    "sourceURL": "https://build.protomaps.com/20260924.pmtiles",
+    "sha256": "0518eb573353b7c4990d1e10eb160d1270fa93d36376ace23da3f352743bbfd3"
+  },
+  {
+    "version": 1,
+    "id": "stockholm",
+    "name": "Stockholm",
+    "schema": "protomaps-v4",
+    "bounds": {
+      "west": 17.0,
+      "south": 58.7,
+      "east": 19.4,
+      "north": 60.3
+    },
+    "focus": {
+      "latitude": 59.3293,
+      "longitude": 18.0686
+    },
+    "sourceDate": "2026-09-24T04:00:00Z",
+    "attribution": "© OpenStreetMap contributors (ODbL) · Natural Earth · Protomaps",
+    "sourceURL": "https://build.protomaps.com/20260924.pmtiles",
+    "sha256": "4044124fe90b53cb56d0704ddb7e34efeea3565108cea7c28e642fccb28d0c35"
+  },
+  {
+    "version": 1,
+    "id": "uppland",
+    "name": "Uppland",
+    "schema": "protomaps-v4",
+    "bounds": {
+      "west": 16.4,
+      "south": 59.3,
+      "east": 19.2,
+      "north": 60.8
+    },
+    "focus": {
+      "latitude": 59.8586,
+      "longitude": 17.6389
+    },
+    "sourceDate": "2026-09-24T04:00:00Z",
+    "attribution": "© OpenStreetMap contributors (ODbL) · Natural Earth · Protomaps",
+    "sourceURL": "https://build.protomaps.com/20260924.pmtiles",
+    "sha256": "e2787f3ca8fd369cfd11d27051d48dfe32aaf3676ba56fa95cf25ed2acd0ed97"
+  },
+  {
+    "version": 1,
+    "id": "skane",
+    "name": "Skåne",
+    "schema": "protomaps-v4",
+    "bounds": {
+      "west": 12.4,
+      "south": 55.3,
+      "east": 14.7,
+      "north": 56.6
+    },
+    "focus": {
+      "latitude": 55.605,
+      "longitude": 13.0038
+    },
+    "sourceDate": "2026-09-24T04:00:00Z",
+    "attribution": "© OpenStreetMap contributors (ODbL) · Natural Earth · Protomaps",
+    "sourceURL": "https://build.protomaps.com/20260924.pmtiles",
+    "sha256": "41ed403e42b4a55cef1aa223940517ed4f5609793492d538d34e434a56174fe7"
+  },
+  {
+    "version": 1,
+    "id": "jamtland",
+    "name": "Jämtland",
+    "schema": "protomaps-v4",
+    "bounds": {
+      "west": 11.8,
+      "south": 62.5,
+      "east": 16.8,
+      "north": 65.1
+    },
+    "focus": {
+      "latitude": 63.1792,
+      "longitude": 14.6357
+    },
+    "sourceDate": "2026-09-24T04:00:00Z",
+    "attribution": "© OpenStreetMap contributors (ODbL) · Natural Earth · Protomaps",
+    "sourceURL": "https://build.protomaps.com/20260924.pmtiles",
+    "sha256": "125d8785be8f04e44d9e65128b042d6e4e80656ca7ba17a3cbb99434a95170c7"
+  }
+]

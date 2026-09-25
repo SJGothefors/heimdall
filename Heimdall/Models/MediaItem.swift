@@ -16,4 +16,5 @@ struct FieldJournal: Codable {
     var annotations: [MapAnnotation] = []
     var media: [MediaItem] = []
     var reports: [SevenSReport] = []
+    var ownPosition: PositionSnapshot?
 }

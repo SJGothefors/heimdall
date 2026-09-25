@@ -25,9 +25,9 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>Unlock the maps, reports and media stored on this iPhone.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Show your current location on the offline Sweden map while Heimdall is open. Location history is not saved.</string>
+	<string>Show your position on the offline map and attach a position snapshot to voice reports when GPS is enabled. No continuous location track is recorded.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Record audio with videos saved only on this iPhone.</string>
+	<string>Record voice reports and video audio in protected storage on this iPhone.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

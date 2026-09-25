@@ -1,10 +1,10 @@
 import Foundation
 import CoreGraphics
 
-struct MapViewport {
+struct MapViewport: Equatable {
     var center = MapBounds.sweden.center.worldPoint
     var zoom = 4.5
-    var scale: Double { 256 * pow(2, zoom) }
+    var scale: Double { 512 * pow(2, zoom) }
 
     func screenPoint(_ coordinate: Coordinate, size: CGSize) -> CGPoint {
         let p = coordinate.worldPoint
@@ -21,12 +21,12 @@ struct MapViewport {
         center = bounds.center.worldPoint
         let width = bounds.bottomRight.x - bounds.topLeft.x
         let height = bounds.bottomRight.y - bounds.topLeft.y
-        zoom = log2(max(1, min((size.width - 64) / width, (size.height - 110) / height)) / 256)
+        zoom = log2(max(1, min((size.width - 64) / width, (size.height - 110) / height)) / 512)
         clamp()
     }
 
     mutating func clamp() {
-        zoom = min(16, max(3, zoom))
+        zoom = min(19, max(1, zoom))
         center.x = min(MapBounds.sweden.bottomRight.x, max(MapBounds.sweden.topLeft.x, center.x))
         center.y = min(MapBounds.sweden.bottomRight.y, max(MapBounds.sweden.topLeft.y, center.y))
     }

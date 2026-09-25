@@ -7,6 +7,14 @@ final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate
     private(set) var message = "Location is off"
     private(set) var isEnabled = false
     private let manager = CLLocationManager()
+    var manualPosition: PositionSnapshot?
+
+    var currentPosition: PositionSnapshot? {
+        if let coordinate = freshCoordinate, MapBounds.sweden.contains(coordinate), let fix {
+            return PositionSnapshot(coordinate: coordinate, source: .gps, timestamp: fix.timestamp, accuracy: fix.horizontalAccuracy)
+        }
+        return isEnabled ? nil : manualPosition
+    }
 
     override init() {
         super.init()

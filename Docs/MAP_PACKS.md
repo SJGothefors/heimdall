@@ -1,50 +1,58 @@
-# Local map packages, version 1
+# Offline regional map packages
 
-Choose **Device → Import local map folder** and select a folder already on the phone. Two files are copied; additional files are ignored:
+**Gotland is loaded on first launch.** Stockholm, Uppland, Skåne and Jämtland are stored as ZIPs. Device → Offline map regions lets you load **two together**, show either, or archive one. Loading a third never silently evicts a region. Layers → Loaded map borders toggles coverage outlines in Vector, Photo and 3D.
 
-```text
-MySwedenMap/
-  map.json
-  photo.jpg
+Packages cover buffered rectangular extents, not exact province/county boundaries. Neighboring packages overlap intentionally. The outline marks the declared extent where the extracted tile pyramid supplies detail; whole tiles can extend slightly beyond it. The country overview stays available outside loaded coverage.
+
+## Prepare the included regions
+
+On a fresh clone, run while connected:
+
+```sh
+python3 Scripts/prepare_region.py --all
 ```
 
-Use the bundled `Heimdall/Resources/Sweden` as a complete working example. Coordinates are WGS 84 decimal degrees. The photo and elevation grid must cover **exactly the manifest bounds**, projected in **Web Mercator (EPSG:3857)**, north at the top. Do not supply an unprojected latitude/longitude raster.
+Use `--region gotland` to prepare one, `--force` to rebuild, or `--pmtiles /path/to/pmtiles` to use an installed CLI. All five are required for the default app build. `--all --check` checks presence without network access.
+
+`Scripts/regions.json` pins each extent, focus point, data date, source URL and SHA-256 of the extracted PMTiles. The script downloads the official **go-pmtiles 1.31.2** release, verifies its published SHA-256, extracts zooms 0–15 and verifies the result against the catalog. Preparation failure leaves the previous ZIP intact. Public data and CLI downloads require no API key.
+
+The ZIPs total about 844 MB. They are ignored by Git; source, catalog, fonts and the small country overview are tracked. Running the app does not download map data. An installed app contains all five ZIPs, so switching regions works in airplane mode.
+
+## Import another package
+
+Transfer its ZIP into **On My iPhone**, then choose **Device → Import map package**. Import validates and stores the archive; choose Load region to use it. Only these root-level files are allowed:
+
+```text
+region.zip
+  manifest.json
+  basemap.pmtiles
+  imagery.pmtiles    (optional)
+```
+
+Example `manifest.json` (replace hashes with those of your actual files):
 
 ```json
 {
   "version": 1,
-  "name": "My regional map",
-  "detail": "Source, date and practical resolution",
-  "attribution": "Required data attribution and licence notices",
-  "bounds": {"west": 15, "south": 59, "east": 16, "north": 60},
-  "features": [
-    {
-      "kind": "land",
-      "paths": [[
-        {"latitude": 59, "longitude": 15},
-        {"latitude": 60, "longitude": 15},
-        {"latitude": 60, "longitude": 16},
-        {"latitude": 59, "longitude": 16},
-        {"latitude": 59, "longitude": 15}
-      ]]
-    }
-  ],
-  "places": [{"name": "Example", "coordinate": {"latitude": 59.5, "longitude": 15.5}, "population": 100}],
-  "elevation": {"columns": 2, "rows": 2, "meters": [100, 110, 90, 105]}
+  "id": "gotland",
+  "name": "Gotland",
+  "schema": "protomaps-v4",
+  "bounds": {"west": 17.8, "south": 56.8, "east": 19.5, "north": 58.5},
+  "focus": {"latitude": 57.6348, "longitude": 18.2948},
+  "sourceDate": "2026-09-24T04:00:00Z",
+  "attribution": "© OpenStreetMap contributors (ODbL) · Natural Earth · Protomaps",
+  "sourceURL": "https://build.protomaps.com/20260924.pmtiles",
+  "sha256": "0518eb573353b7c4990d1e10eb160d1270fa93d36376ace23da3f352743bbfd3"
 }
 ```
 
-Supported feature kinds: `land`, `water`, `river`, `road`. Each path is an ordered coordinate array; land/water use even-odd polygon filling, including holes. Lines are stroked. All geometry must lie within the package bounds. Elevation samples are row-major from the northwest, equally spaced **in projected coordinates**, in meters above sea level. Negative values are permitted but rendered at sea level in the terrain viewer.
+- **Basemap:** PMTiles v3, MVT tiles, **Protomaps v4 schema**. Generic PMTiles using another schema, MBTiles, raw OSM PBF and Apple/Google Maps downloads are not interchangeable with this style.
+- **Imagery:** optional PMTiles v3 containing PNG, JPEG or WebP raster tiles. Include `imagerySHA256` in the manifest when present. Supply legally licensed aerial data for the declared extent.
+- Source URLs are provenance text, never fetched by the app. Styles and glyphs come from the app, not imported packages.
+- IDs contain 1–60 lowercase ASCII letters, digits or hyphens. Bounds must be finite and within the supported Sweden envelope; focus must lie inside them.
+- At most three regular ZIP entries, no folders, symlinks, duplicate names or traversal paths. Manifest ≤16 KiB; total uncompressed size ≤2 GB. CRC, byte counts, SHA-256, PMTiles v3 header/type/section offsets and zoom limits are checked before publishing a working copy.
+- This is structural/integrity validation, **not authentication of a map provider** or proof that every internal tile is well-formed. Imported manifests and maps are not signed. Metadata does not establish map quality or freshness.
 
-Validation limits:
+Imported archives and working copies use complete iOS file protection and backup exclusions. Staging is cleaned on the next successful journal load after interruption. Validation failure leaves loaded regions unchanged. Archiving/removing maps does not modify tactical layers, reports, voice recordings or media.
 
-- Bounds within 9–26° E and 54–71° N, increasing and finite. The annotation workspace is 10–25° E and 55–70° N.
-- `map.json`: 40 MB; `photo.jpg`: 32 MB.
-- Image dimensions at most 8192 per side and 24 million pixels total.
-- Up to 30,000 features, 300,000 total vertices, 10,000 places.
-- Elevation: 2–512 columns and rows; sample count must match exactly; finite heights from −12,000 to 10,000 meters.
-- Local regular files only; symlinks rejected. Filenames are fixed and no remote URLs, scripts or style expressions are interpreted.
-
-Validation happens before replacing the current pack. Imported data is protected and excluded from backups. **Use bundled Sweden overview** restores the built-in map without touching annotations, reports or media. A regional import replaces the active basemap; it does not imply coverage outside its bounds. Source quality, freshness and authenticity remain the provider's responsibility. There is no digital signature or trust authority for imported packs.
-
-This simple format is intended for modest country overviews and bounded regional detail. It does not support a multi-gigabyte tiled national map. For that scale, introduce an offline tile engine and a carefully provisioned package format rather than increasing these in-memory limits.
+Old overview folders from earlier app builds can still be read for photo/elevation compatibility. New imports use the ZIP workflow above; the detailed vector renderer uses the fixed local style and PMTiles sources.
