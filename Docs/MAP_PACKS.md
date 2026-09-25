@@ -53,6 +53,8 @@ Example `manifest.json` (replace hashes with those of your actual files):
 - At most three regular ZIP entries, no folders, symlinks, duplicate names or traversal paths. Manifest ≤16 KiB; total uncompressed size ≤2 GB. CRC, byte counts, SHA-256, PMTiles v3 header/type/section offsets and zoom limits are checked before publishing a working copy.
 - This is structural/integrity validation, **not authentication of a map provider** or proof that every internal tile is well-formed. Imported manifests and maps are not signed. Metadata does not establish map quality or freshness.
 
-Imported archives and working copies use complete iOS file protection and backup exclusions. Staging is cleaned on the next successful journal load after interruption. Validation failure leaves loaded regions unchanged. Archiving/removing maps does not modify tactical layers, reports, voice recordings or media.
+Import first makes a bounded, protected private copy of the selected ZIP. Validation and extraction use that copy, and the app retains those same bytes. Changing the provider's original file during or after validation cannot replace the validated archive. Loading checks that the extracted manifest still matches the selected catalog entry.
+
+Imported archives and working copies use complete iOS file protection and backup exclusions. Staging is cleaned on the next successful journal load after interruption. Validation failure leaves loaded regions unchanged. Archiving/removing maps does not modify tactical layers, reports, voice recordings or media. Hashes establish integrity against the manifest, not the identity or trustworthiness of its author; see [Security](SECURITY.md).
 
 Old overview folders from earlier app builds can still be read for photo/elevation compatibility. New imports use the ZIP workflow above; the detailed vector renderer uses the fixed local style and PMTiles sources.

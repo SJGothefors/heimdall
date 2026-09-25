@@ -1,101 +1,66 @@
 # Heimdall
 
-A native, dark-mode iPhone field notebook for **iOS 27**. SwiftUI with MapLibre Native for offline maps and ZIPFoundation for map packages. No backend, accounts or analytics.
+Heimdall is an offline field notebook for iPhone, built with SwiftUI for **iOS 27**. It combines local maps, map annotations, 7S reports, voice recordings, photos and videos. There is no backend, account system or analytics SDK.
 
-[Portrait preview](Docs/Screenshots/map-portrait.png) · [Landscape preview](Docs/Screenshots/map-landscape.png).
+[Portrait preview](Docs/Screenshots/map-portrait.png) · [Landscape preview](Docs/Screenshots/map-landscape.png)
 
-## Included
+This is a prototype for testing. It uses device authentication and iOS Data Protection, but has not had an independent security audit. **Offline does not mean invulnerable, and local storage is not a backup.** Read the [security and data-safety notes](Docs/SECURITY.md) before putting sensitive information on a phone.
 
-- **Gotland preconfigured**, with Stockholm, Uppland, Skåne and Jämtland stored on the phone. Load up to **two detailed regions together**, archive either independently, and toggle their coverage outlines in Layers. The Sweden overview remains available outside loaded regions.
-- Independent **BLUE / RED / TAC** layers. Add points, draw lines and polygons by tapping vertices, name and annotate objects, hide layers, and delete individual objects.
-- A **7S notebook** with Stund, Ställe, Styrka, Slag, Sysselsättning, Symbol and Sagesman. Save incomplete drafts, reopen/edit them, read plain text over a radio, mark them sent, and delete them. The app does not transmit radio messages.
-- Photo and video capture into an app-private local vault, thumbnails, playback, and deletion. Media is not added to Photos, so Heimdall does not initiate iCloud Photos sync. Videos are limited to five minutes per clip.
-- **MGRS coordinates**, optional manual own-position marker, and opt-in foreground GPS (off by default). Recording metadata distinguishes manual positions from GPS and preserves the position timestamp. No track history.
-- **Operator callsign** in Device → Callsign, shown beside your blue GPS/manual position marker. Leave it empty to use the GPS/MANUAL label. The callsign is saved in the protected local journal.
-- Device authentication, complete file protection, backup exclusions, app-switcher shielding, and screen-recording/mirroring shielding.
-- Local ZIP import of standard Protomaps v4 PMTiles, with optional raster imagery.
-- Voice 7S drafts with playback, capture time and position metadata. Swedish/English **on-device speech-to-text**, using Apple language models prepared explicitly in Device settings before going offline. Availability depends on the device and language. Recording and manual notes do not require a model.
-- Portrait and both landscape orientations, a hamburger navigation menu, coordinates alongside the top map controls, and an adaptive media grid. Bottom map buttons sit just above the home gesture area. Rotation preserves the active drawing and report editor.
+## What it does
 
-## Run
+- **Maps:** Gotland loads initially. Stockholm, Uppland, Skåne and Jämtland are also bundled; keep up to two detailed regions loaded at once. A Sweden overview remains available outside them. Import additional local ZIP packages in Device settings.
+- **Annotations:** independent BLUE, RED and TAC layers with named points, lines and areas. Show, hide, edit or delete individual objects.
+- **7S reports:** Stund, Ställe, Styrka, Slag, Sysselsättning, Symbol and Sagesman. Save incomplete drafts, edit them, read them over a separate radio and mark them sent. “Sent” is a notebook status; the app transmits nothing.
+- **Voice:** recordings of up to five minutes, with capture time and an optional position snapshot. Swedish and English transcription runs on the device after you explicitly prepare the language models in Device settings. Audio and manual notes work without those models.
+- **Media:** photos and videos in an app-private vault, with thumbnails and playback. Videos are limited to five minutes. Capture does not save to Photos.
+- **Position:** MGRS/WGS 84 display, a saved manual marker and optional foreground GPS, off by default. A local callsign labels your position. There is no track history; voice reports can retain individual position snapshots.
 
-The regional data is already prepared in this workspace. The ZIPs total about **844 MB** and are excluded from Git because several exceed GitHub's file-size limit. On a fresh clone, prepare them once while online:
+The interface supports portrait and both landscape orientations. Rotation preserves active drawings and report editors. Unsaved text and drawings are not guaranteed to survive locking, backgrounding or process termination; save before leaving the app.
+
+## Build and run
+
+Install **Xcode 27**, including an iOS 27 simulator runtime. On a fresh clone, prepare the public regional packages while online:
 
 ```sh
 python3 Scripts/prepare_region.py --all
-```
-
-This downloads a checksum-pinned official PMTiles CLI and the public regional extracts. The build checks that all five packages exist; it never downloads them implicitly. Initial Swift package resolution also needs internet. Once installed, maps and recordings work offline.
-
-### VS Code or Terminal
-
-Keep **Xcode 27 installed** for Apple's iOS SDK and simulator. You can use VS Code as your editor; open the whole `heimdall` folder, then press **Cmd+Shift+B** to run the included **Run Heimdall in iPhone simulator** task. The optional [Swift extension](https://code.visualstudio.com/docs/languages/swift) adds Swift editing support. This is an Xcode project, so the included task uses `xcodebuild`; it does not use `swift build` or configure VS Code breakpoint debugging.
-
-The same task works from any terminal in this folder:
-
-```sh
 python3 Scripts/run_simulator.py
 ```
 
-It selects an installed iOS 27+ iPhone simulator, boots it, opens **Device Hub**, builds the app, and launches it. If Device Hub shows a device list, select the iPhone named in the terminal output. No Apple account or signing team is needed for this simulator workflow. Build errors remain visible in the terminal.
+Preparation downloads a checksum-pinned PMTiles CLI and verifies the regional extracts against `Scripts/regions.json`. The five ZIPs total about **844 MB** and are excluded from Git. Initial Swift package resolution also needs internet. Builds check for maps but never download them implicitly. The installed app can load its bundled regions offline.
 
-This command enables the existing **Debug simulator-only authentication bypass**, so previewing the interface does not require a simulated passcode. Use `python3 Scripts/run_simulator.py --authenticate` to exercise authentication, or `--device 'iPhone 18 Pro'` to choose a particular installed simulator. It preserves the simulator's local app data.
+The run script builds, opens Device Hub and launches an installed iPhone simulator. Select the named phone in Device Hub if it displays a device list. It preserves the simulator's notebook and uses the **Debug simulator-only** authentication bypass. To exercise authentication or select a device:
 
-### Xcode
+```sh
+python3 Scripts/run_simulator.py --authenticate
+python3 Scripts/run_simulator.py --device 'iPhone 18 Pro'
+```
 
-1. Open `Heimdall.xcodeproj` in **Xcode 27**.
-2. Select the **Heimdall** scheme and an iPhone simulator running iOS 27.
-3. Choose **Product > Run** (**Cmd+R**, or the triangle in the toolbar). The simulated iPhone appears in **Device Hub**, separately from the source editor. An empty editor saying “No Selection” is not the app screen. Xcode Cloud sign-in is not needed.
-4. The normal Xcode launch requests device authentication. For simulator UI preview, add `--ui-testing` under **Product > Scheme > Edit Scheme > Run > Arguments > Arguments Passed On Launch**, or use the terminal command above.
+In VS Code, open this folder and use **Cmd+Shift+B** for the same workflow. Building uses `xcodebuild`, not `swift build`.
 
-For a **physical iPhone**, select your development team under Signing & Capabilities, change the bundle identifier if necessary, and select the connected device as the run destination. The iPhone must have a passcode configured. Camera and microphone permissions are requested only when used; location is opt-in.
+In Xcode, open `Heimdall.xcodeproj`, select the Heimdall scheme and an iOS 27 iPhone, then **Product → Run**. A normal launch requests device authentication. For simulator previews, add `--ui-testing` to the scheme's launch arguments. This bypass is compiled out of Release builds and every physical-device build.
 
-The checked-in Xcode project is ready to open. If you add source files outside Xcode, regenerate it with `python3 Scripts/generate_project.py`. Xcode resolves the two pinned Swift packages; no XcodeGen or CocoaPods is needed.
+For a physical iPhone, select your signing team and connected device, and change the bundle identifier if needed. The phone needs a passcode. Camera, microphone and location access are requested when used.
 
-For simulator UI development only, the Debug build accepts `--ui-testing` as a launch argument to bypass device authentication. This code is excluded from Release builds **and all physical-device builds**. Normal builds never seed invented observations, reports or media.
-
-## Map coverage and limits
-
-The regional packages contain Protomaps v4 vector tiles derived from OpenStreetMap, with roads, intersections, buildings and place names through **zoom 15**. Higher zooms enlarge this detail. Sources are dated **2026-09-24**. Regional extents are buffered rectangles, not exact administrative or historical province boundaries; the outlines show those package extents.
-
-| Region | Stored ZIP |
-| --- | ---: |
-| Gotland (loaded initially) | 16 MB |
-| Stockholm | 173 MB |
-| Uppland | 176 MB |
-| Skåne | 142 MB |
-| Jämtland | 337 MB |
-
-Loading expands a working copy in protected storage. Archiving removes that copy but keeps the bundled ZIP. Only two working copies can be loaded. PMTiles already compresses tiles, so ZIP archiving is not a large additional compression gain. MapLibre reads tiles on demand instead of loading the whole region into memory.
-
-Outside loaded regions, the overview covers **55–70° N, 10–25° E**:
-
-- Vector: Natural Earth **1:10 million** geography; not ten-meter resolution.
-- Photo: NASA Blue Marble **July 2004**, a low-resolution historical overview. Detailed aerial imagery is **not included**; the package format accepts separately licensed raster PMTiles.
-- 3D: a **129 × 257** elevation grid, relief exaggerated **12×**. It remains a terrain overview, not a measurement or line-of-sight tool. Detailed regional vectors do not add detailed elevation.
-
-Map completeness and freshness depend on the sources. The app does not implement CoT, TAK servers, team networking, routing or standardized military symbology. Display coordinates use MGRS/WGS 84; manually entered 7S place descriptions remain free text. See [map packages](Docs/MAP_PACKS.md) and [data sources](Docs/DATA_SOURCES.md).
-
-## Structure
+## Working on the code
 
 ```text
 Heimdall/
-  App/               App lifecycle, privacy shield, navigation, theme
-  Models/            Coordinates, annotations, maps, media, 7S reports
-  Services/          Storage, package import, location, authentication, recording, speech
-  Features/Map/      Local MapLibre style, terrain viewer, drawing and layers
-  Features/Reports/  Seven-field editor, voice attachments and radio-reading view
-  Features/Media/    Native capture and local vault
-  Features/Settings/ Device controls, map import and data credits
-  Resources/Sweden/  Country overview, photo and elevation
-  Resources/Maps/    Local region ZIPs, overview geometry and fonts
-HeimdallTests/       Persistence, geometry, import and media tests
-HeimdallUITests/     Map and report lifecycle UI tests
+  App/               Lifecycle, authentication gate, privacy shield, navigation
+  Models/            Journal schema, validation, reports, coordinates and maps
+  Services/          Persistence, map import, network policy, capture and speech
+  Features/Map/      MapLibre style, terrain, drawing and layers
+  Features/Reports/  Report editor, reader and voice controls
+  Features/Media/    Camera UI and local vault browser
+  Features/Settings/ Device controls, map packages and speech preparation
+  Resources/         Bundled maps, fonts, assets, permissions and entitlements
+HeimdallTests/       Persistence, import, offline policy and rendering tests
+HeimdallUITests/     Navigation, rotation and field workflows
+Scripts/            Project generation, public map preparation and simulator run
 ```
 
-The journal is an atomic JSON file under Application Support. Large media files stay outside the journal. Failed writes are surfaced to the user; corrupt journals are preserved and cannot be silently overwritten. There is no custom encryption scheme. Security depends on the iPhone passcode, iOS Data Protection and the application sandbox. Read [Docs/SECURITY.md](Docs/SECURITY.md) for guarantees and limits.
+Start with [Architecture](Docs/ARCHITECTURE.md) for ownership, data flow, storage layout and change guidelines. The Xcode project is generated by `Scripts/generate_project.py`; run it after adding or moving Swift files or changing build settings. Edit the generator for lasting project-setting changes. MapLibre Native **6.31.0** and ZIPFoundation **0.9.20** are pinned.
 
-## Build and test
+Run the tests:
 
 ```sh
 xcodebuild -project Heimdall.xcodeproj -scheme Heimdall \
@@ -104,11 +69,28 @@ xcodebuild -project Heimdall.xcodeproj -scheme Heimdall \
   -collect-test-diagnostics never -parallel-testing-enabled NO test
 ```
 
-See [Docs/TESTING.md](Docs/TESTING.md) for device acceptance checks. The simulator cannot validate a real camera, GNSS reception, passcode-protected storage while locked, or operation under field conditions.
+See [Testing](Docs/TESTING.md) for verified results and the separate physical-device checks. A simulator cannot establish locked-device encryption, real camera behavior or field GNSS performance. Use synthetic observations, recordings and screenshots. Keep any copied operational data in the ignored `LocalData/` folder, never in source or test fixtures.
 
-## Rebuild the overview maps (optional, online build step)
+## Coverage and limits
 
-The data is already included; this is **not** needed to build or run the app.
+Regional vectors contain roads, buildings and place names through **zoom 15**, derived from OpenStreetMap data dated **2026-09-24**. Higher zooms enlarge the same detail. Package boundaries are buffered rectangles, not administrative borders. Loading expands a protected working copy; archiving removes that copy and keeps the stored ZIP.
+
+| Region | Stored ZIP |
+| --- | ---: |
+| Gotland | 16 MB |
+| Stockholm | 173 MB |
+| Uppland | 176 MB |
+| Skåne | 142 MB |
+| Jämtland | 337 MB |
+
+The country overview covers **55–70° N, 10–25° E**. Its vectors are Natural Earth **1:10 million**, its photo is low-resolution NASA Blue Marble from **July 2004**, and its terrain is a **129 × 257** elevation grid with relief exaggerated **12×**. Detailed aerial imagery is not included. This is not a routing, measurement or line-of-sight system. There is no TAK/CoT networking or standardized military symbology implementation.
+
+- [Map packages](Docs/MAP_PACKS.md): format, import validation and preparation.
+- [Data sources](Docs/DATA_SOURCES.md): attribution, dates and imagery limitations.
+- [Security](Docs/SECURITY.md): offline boundaries, stored metadata and failure handling.
+- [Performance](Docs/PERFORMANCE.md): rendering, image memory, measurements and phone profiling.
+
+Rebuilding the already bundled country overview is an optional online development step:
 
 ```sh
 python3 -m venv .venv
@@ -116,4 +98,4 @@ python3 -m venv .venv
 .venv/bin/python Scripts/prepare_maps.py
 ```
 
-The preparation script downloads only public cartographic source data. It never reads user journal/media files. Sources are cached in `/private/tmp/heimdall-map-sources`. See [Docs/DATA_SOURCES.md](Docs/DATA_SOURCES.md) for attribution and source URLs.
+The preparation scripts read public cartography, not the phone's journal or media.

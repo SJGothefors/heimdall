@@ -49,6 +49,9 @@ final class MapRepository {
             try manifest.validate()
             guard directory.lastPathComponent == manifest.id else { throw AppError.invalidMap }
             try RegionPacks.validatePMTiles(directory.appendingPathComponent("basemap.pmtiles"), vector: true)
+            if manifest.imagerySHA256 != nil {
+                try RegionPacks.validatePMTiles(directory.appendingPathComponent("imagery.pmtiles"), vector: false)
+            }
             return manifest
         }.sorted { $0.id < $1.id }
         guard loadedRegions.count <= 2 else { throw AppError.invalidMap }
@@ -88,6 +91,9 @@ final class MapRepository {
     }
 
     func useBundledMap() async throws {
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
         guard let directory = Bundle.main.resourceURL?.appendingPathComponent("Sweden") else {
             throw AppError.missingMap
         }
@@ -132,16 +138,15 @@ final class MapRepository {
         try await Task.detached(priority: .userInitiated) {
             let access = source.startAccessingSecurityScopedResource()
             defer { if access { source.stopAccessingSecurityScopedResource() } }
-            let pack = try RegionPacks.inspect(source)
-            let stage = root.appendingPathComponent("RegionImport-\(UUID().uuidString)")
-            defer { try? FileManager.default.removeItem(at: stage) }
-            // Validate decompressed bytes and hashes before keeping an archive.
-            _ = try RegionPacks.extract(source, to: stage)
+            // Validate a private snapshot, then keep those exact bytes. A file
+            // provider can change the selected file while an import is running.
             let copy = root.appendingPathComponent("Archive-\(UUID().uuidString).zip")
             defer { try? FileManager.default.removeItem(at: copy) }
-            try FileManager.default.copyItem(at: source, to: copy)
-            try SecureFiles.protect(copy)
-            let destination = archives.appendingPathComponent(pack.id + ".zip")
+            try RegionPacks.copyArchive(source, to: copy)
+            let stage = root.appendingPathComponent("RegionImport-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: stage) }
+            let manifest = try RegionPacks.extract(copy, to: stage)
+            let destination = archives.appendingPathComponent(manifest.id + ".zip")
             if FileManager.default.fileExists(atPath: destination.path) {
                 _ = try FileManager.default.replaceItemAt(destination, withItemAt: copy)
             } else {
@@ -162,6 +167,7 @@ final class MapRepository {
             let stage = root.appendingPathComponent("RegionStage-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: stage) }
             let manifest = try RegionPacks.extract(pack.archiveURL, to: stage)
+            guard manifest == pack.manifest else { throw AppError.invalidMap }
             if FileManager.default.fileExists(atPath: destination.path) {
                 _ = try FileManager.default.replaceItemAt(destination, withItemAt: stage)
             } else {

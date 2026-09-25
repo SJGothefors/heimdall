@@ -1,23 +1,13 @@
 @preconcurrency import MapLibre
 import SwiftUI
 
-/// MapLibre reads only bundled/local sources. Fail closed if a renderer ever
-/// attempts an HTTP request (including a missing glyph or style fallback).
-final class OfflineMapProtocol: URLProtocol, @unchecked Sendable {
-    override class func canInit(with request: URLRequest) -> Bool {
-        ["http", "https"].contains(request.url?.scheme ?? "")
-    }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-    override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet)) }
-    override func stopLoading() {}
-}
-
 struct OfflineVectorMap: UIViewRepresentable {
     let maps: MapRepository
     let photoMode: Bool
     let showRegionBorders: Bool
     @Binding var viewport: MapViewport
     let annotations: [MapAnnotation]
+    let visibleLayers: Set<TacticalLayer>
     let draft: [Coordinate]
     let activeLayer: TacticalLayer
     let location: PositionSnapshot?
@@ -26,10 +16,7 @@ struct OfflineVectorMap: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> MLNMapView {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [OfflineMapProtocol.self]
-        configuration.urlCache = nil
-        MLNNetworkConfiguration.sharedManager.sessionConfiguration = configuration
+        MLNNetworkConfiguration.sharedManager.sessionConfiguration = OfflineMapNetwork.configuration()
         let map = MLNMapView(frame: .zero, styleJSON: OfflineMapStyle.json(maps: maps, photo: photoMode))
         context.coordinator.settingCamera = true
         map.delegate = context.coordinator
@@ -66,14 +53,16 @@ struct OfflineVectorMap: UIViewRepresentable {
             context.coordinator.settingCamera = false
         }
         context.coordinator.updateObjects(map)
-        context.coordinator.updateCoverage(map)
+        context.coordinator.updateVisibility(map)
     }
     static func dismantleUIView(_ map: MLNMapView, coordinator: Coordinator) { map.delegate = nil }
 
     @MainActor final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate {
         var parent: OfflineVectorMap
         var settingCamera = false
-        var lastObjects: Data?
+        let overlays = MapOverlayRenderer()
+        var lastVisibility: Set<TacticalLayer>?
+        var lastCoverage: Bool?
         init(_ parent: OfflineVectorMap) { self.parent = parent }
         @objc func tapped(_ recognizer: UITapGestureRecognizer) {
             guard recognizer.state == .ended, let map = recognizer.view as? MLNMapView else { return }
@@ -81,9 +70,11 @@ struct OfflineVectorMap: UIViewRepresentable {
             parent.onTap(Coordinate(latitude: coordinate.latitude, longitude: coordinate.longitude))
         }
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
-            lastObjects = nil
+            overlays.invalidate()
+            lastVisibility = nil
+            lastCoverage = nil
             updateObjects(mapView)
-            updateCoverage(mapView)
+            updateVisibility(mapView)
         }
         func mapViewRegionIsChanging(_ mapView: MLNMapView) { updateCamera(mapView) }
         func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) { updateCamera(mapView) }
@@ -108,46 +99,38 @@ struct OfflineVectorMap: UIViewRepresentable {
                 self.parent.viewport = updated
             }
         }
-        func updateCoverage(_ map: MLNMapView) {
-            for id in ["coverage-outline", "coverage-labels"] {
-                map.style?.layer(withIdentifier: id)?.isVisible = parent.showRegionBorders
+        func updateVisibility(_ map: MLNMapView) {
+            guard let style = map.style else { return }
+            if lastCoverage != parent.showRegionBorders {
+                for id in ["coverage-outline", "coverage-labels"] {
+                    style.layer(withIdentifier: id)?.isVisible = parent.showRegionBorders
+                }
+                lastCoverage = parent.showRegionBorders
+            }
+            if lastVisibility != parent.visibleLayers {
+                // The unfinished drawing remains visible, as it did before
+                // saved objects and drafts had separate sources.
+                for layer in TacticalLayer.allCases {
+                    for kind in ["area", "line", "point", "label"] {
+                        style.layer(withIdentifier: "objects-\(kind)-\(layer.rawValue)")?.isVisible =
+                            parent.visibleLayers.contains(layer)
+                    }
+                }
+                lastVisibility = parent.visibleLayers
             }
         }
         func updateObjects(_ map: MLNMapView) {
-            guard let source = map.style?.source(withIdentifier: "objects") as? MLNShapeSource else { return }
-            var features: [[String: Any]] = []
-            func append(_ coordinates: [Coordinate], kind: AnnotationKind, layer: String, title: String) {
-                guard !coordinates.isEmpty else { return }
-                var points = coordinates.map { [$0.longitude, $0.latitude] }
-                if kind == .area, let first = points.first { points.append(first) }
-                let geometry: [String: Any] = [
-                    "type": kind == .point ? "Point" : (kind == .line ? "LineString" : "Polygon"),
-                    "coordinates": kind == .point ? points[0] : (kind == .area ? [points] : points),
-                ]
-                features.append([
-                    "type": "Feature", "properties": ["layer": layer, "name": title], "geometry": geometry,
-                ])
-            }
-            for item in parent.annotations {
-                append(item.coordinates, kind: item.kind, layer: item.layer.rawValue, title: item.title)
-            }
-            if parent.draft.count >= 2 {
-                append(parent.draft, kind: .line, layer: parent.activeLayer.rawValue, title: "")
-            }
-            for point in parent.draft { append([point], kind: .point, layer: parent.activeLayer.rawValue, title: "") }
-            if let position = parent.location {
-                append(
-                    [position.coordinate], kind: .point, layer: "OWN",
-                    title: parent.callsign.isEmpty ? (position.source == .manual ? "MANUAL" : "GPS") : parent.callsign)
-            }
-            guard
-                let data = try? JSONSerialization.data(
-                    withJSONObject: ["type": "FeatureCollection", "features": features], options: .sortedKeys),
-                data != lastObjects,
-                let shape = try? MLNShape(data: data, encoding: String.Encoding.utf8.rawValue)
+            guard let style = map.style,
+                MapOverlayRenderer.Source.allCases.allSatisfy({
+                    style.source(withIdentifier: $0.rawValue) is MLNShapeSource
+                })
             else { return }
-            source.shape = shape
-            lastObjects = data
+            for update in overlays.updates(
+                annotations: parent.annotations, draft: parent.draft, layer: parent.activeLayer,
+                position: parent.location, callsign: parent.callsign)
+            {
+                (style.source(withIdentifier: update.source.rawValue) as? MLNShapeSource)?.shape = update.shape
+            }
         }
     }
 }

@@ -44,7 +44,7 @@ struct MapBounds: Codable, Equatable, Sendable {
     }
 
     func contains(_ c: Coordinate) -> Bool {
-        c.isValid && (west...east).contains(c.longitude) && (south...north).contains(c.latitude)
+        isValid && c.isValid && (west...east).contains(c.longitude) && (south...north).contains(c.latitude)
     }
 
     var isValid: Bool {
@@ -82,7 +82,7 @@ struct MapAnnotation: Identifiable, Codable, Equatable, Sendable {
         return coordinates.count >= minimum && coordinates.count <= 10_000 &&
             Set(coordinates).count >= minimum &&
             (kind != .point || coordinates.count == 1) && coordinates.allSatisfy { MapBounds.sweden.contains($0) } &&
-            title.count <= 80 && notes.count <= 2_000
+            title.count <= 80 && notes.count <= 2_000 && createdAt.timeIntervalSince1970.isFinite
     }
 }
 
@@ -130,19 +130,6 @@ struct MapPackage: Codable, Sendable {
         }
         guard places.allSatisfy({ bounds.contains($0.coordinate) && $0.name.count <= 120 }) else {
             throw AppError.invalidMap
-        }
-    }
-}
-
-enum AppError: LocalizedError {
-    case invalidMap, invalidState, missingMap, cameraUnavailable, invalidMedia
-    var errorDescription: String? {
-        switch self {
-        case .invalidMap: "This map pack is invalid or exceeds the supported limits. Your existing map has not changed."
-        case .invalidState: "The local journal could not be read safely. Existing files have been preserved."
-        case .missingMap: "The bundled Sweden map is missing. Reinstall the application build."
-        case .cameraUnavailable: "A camera is not available on this device. Use a physical iPhone to capture media."
-        case .invalidMedia: "The captured media could not be saved. Check available storage and try again."
         }
     }
 }

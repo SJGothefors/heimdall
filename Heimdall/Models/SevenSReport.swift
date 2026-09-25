@@ -22,7 +22,9 @@ struct SevenSReport: Identifiable, Codable, Equatable, Sendable {
     var isEmpty: Bool { fields.allSatisfy { $0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
     var isValid: Bool {
         (!isEmpty || recording != nil) && fields.allSatisfy { $0.1.count <= 2_000 } &&
-        (recording?.isValid ?? true) && (transcript?.count ?? 0) <= 30_000
+        (recording?.isValid ?? true) && (transcript?.count ?? 0) <= 30_000 &&
+        createdAt.timeIntervalSince1970.isFinite && updatedAt.timeIntervalSince1970.isFinite &&
+        (sentAt?.timeIntervalSince1970.isFinite ?? true)
     }
     var completedCount: Int { fields.filter { !$0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count }
     var title: String { stalle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "7S-rapport" : stalle }

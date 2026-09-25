@@ -1,121 +1,149 @@
 import Foundation
 import Observation
 
+/// The only journal writer. A successful disk commit always precedes UI changes.
 @MainActor @Observable
 final class LocalStore {
-    private(set) var annotations: [MapAnnotation] = []
-    private(set) var media: [MediaItem] = []
-    private(set) var reports: [SevenSReport] = []
+    private var journal = FieldJournal()
     private(set) var isLoaded = false
-    private(set) var ownPosition: PositionSnapshot?
-    private(set) var callsign = ""
+    private(set) var cleanupError: String?
     let files: SecureFiles
+
+    var annotations: [MapAnnotation] { journal.annotations }
+    var media: [MediaItem] { journal.media }
+    var reports: [SevenSReport] { journal.reports }
+    var ownPosition: PositionSnapshot? { journal.ownPosition }
+    var callsign: String { journal.callsign ?? "" }
 
     init(files: SecureFiles) { self.files = files }
 
     func load() throws {
         guard !isLoaded else { return }
-        if FileManager.default.fileExists(atPath: files.journalURL.path) {
-            let data = try Data(contentsOf: files.journalURL)
-            let journal = try JSONDecoder().decode(FieldJournal.self, from: data)
-            guard journal.version == 1, journal.annotations.count <= 10_000,
-                journal.annotations.allSatisfy(\.isValid),
-                Set(journal.annotations.map(\.id)).count == journal.annotations.count,
-                Set(journal.media.map(\.id)).count == journal.media.count,
-                journal.reports.count <= 10_000, journal.reports.allSatisfy(\.isValid),
-                Set(journal.reports.map(\.id)).count == journal.reports.count,
-                journal.ownPosition?.isValid ?? true,
-                Self.isValidCallsign(journal.callsign ?? "")
+        var loaded = FieldJournal()
+        do {
+            let values = try files.journalURL.resourceValues(forKeys: [
+                .fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey,
+            ])
+            guard values.isRegularFile == true, values.isSymbolicLink != true,
+                let size = values.fileSize, size <= FieldJournal.maximumBytes
             else { throw AppError.invalidState }
-            annotations = journal.annotations
-            media = journal.media
-            reports = journal.reports
-            ownPosition = journal.ownPosition
-            callsign = journal.callsign ?? ""
+            loaded = try JSONDecoder().decode(FieldJournal.self, from: Data(contentsOf: files.journalURL))
+            try loaded.validate()
+        } catch let error as NSError
+            where error.domain == NSCocoaErrorDomain
+            && error.code == NSFileReadNoSuchFileError
+        {
+            // Only an absent journal means a new notebook. Access failures,
+            // including locked-device protection, must never load empty state.
         }
         try files.cleanStaging()
+        journal = loaded
         isLoaded = true
+        retryPendingDeletions()
     }
 
-    private func commit(annotations: [MapAnnotation], media: [MediaItem], reports: [SevenSReport]? = nil) throws {
+    private func commit(_ edit: (inout FieldJournal) -> Void) throws {
         guard isLoaded else { throw AppError.invalidState }
-        let journal = FieldJournal(
-            annotations: annotations, media: media, reports: reports ?? self.reports, ownPosition: ownPosition,
-            callsign: callsign)
-        try SecureFiles.write(JSONEncoder().encode(journal), to: files.journalURL)
-        self.annotations = annotations
-        self.media = media
-        self.reports = journal.reports
+        var updated = journal
+        edit(&updated)
+        try updated.validate()
+        let data = try JSONEncoder().encode(updated)
+        guard data.count <= FieldJournal.maximumBytes else { throw AppError.journalFull }
+        try SecureFiles.write(data, to: files.journalURL)
+        journal = updated
     }
 
     func save(_ annotation: MapAnnotation) throws {
-        guard annotation.isValid else { throw AppError.invalidState }
-        var updated = annotations
-        if let index = updated.firstIndex(where: { $0.id == annotation.id }) {
-            updated[index] = annotation
-        } else {
-            guard updated.count < 10_000 else { throw AppError.invalidState }
-            updated.append(annotation)
+        try commit { journal in
+            if let index = journal.annotations.firstIndex(where: { $0.id == annotation.id }) {
+                journal.annotations[index] = annotation
+            } else {
+                journal.annotations.append(annotation)
+            }
         }
-        try commit(annotations: updated, media: media)
     }
 
     func deleteAnnotation(_ id: UUID) throws {
-        try commit(annotations: annotations.filter { $0.id != id }, media: media)
+        try commit { $0.annotations.removeAll { $0.id == id } }
     }
 
     func addMedia(_ item: MediaItem) throws {
-        try commit(annotations: annotations, media: [item] + media)
+        try commit { $0.media.insert(item, at: 0) }
     }
 
     func saveReport(_ report: SevenSReport) throws {
-        guard report.isValid else { throw AppError.invalidState }
-        var updated = reports
-        if let index = updated.firstIndex(where: { $0.id == report.id }) {
-            updated[index] = report
-        } else {
-            guard updated.count < 10_000 else { throw AppError.invalidState }
-            updated.insert(report, at: 0)
+        try commit { journal in
+            if let index = journal.reports.firstIndex(where: { $0.id == report.id }) {
+                if let old = journal.reports[index].recording, old.id != report.recording?.id {
+                    journal.pendingDeletions = (journal.pendingDeletions ?? []) + [.voice(old)]
+                }
+                journal.reports[index] = report
+            } else {
+                journal.reports.insert(report, at: 0)
+            }
         }
-        try commit(annotations: annotations, media: media, reports: updated)
+        retryPendingDeletions()
     }
 
     func deleteReport(_ id: UUID) throws {
-        if let recording = reports.first(where: { $0.id == id })?.recording {
-            let url = files.voiceDirectory.appendingPathComponent(recording.fileName)
-            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        try commit { journal in
+            if let recording = journal.reports.first(where: { $0.id == id })?.recording {
+                journal.pendingDeletions = (journal.pendingDeletions ?? []) + [.voice(recording)]
+            }
+            journal.reports.removeAll { $0.id == id }
         }
-        try commit(annotations: annotations, media: media, reports: reports.filter { $0.id != id })
+        try finishDeletion()
     }
 
     func setOwnPosition(_ position: PositionSnapshot?) throws {
-        guard isLoaded, position?.isValid ?? true else { throw AppError.invalidState }
-        let journal = FieldJournal(
-            annotations: annotations, media: media, reports: reports, ownPosition: position, callsign: callsign)
-        try SecureFiles.write(JSONEncoder().encode(journal), to: files.journalURL)
-        ownPosition = position
+        try commit { $0.ownPosition = position }
     }
 
-    static func isValidCallsign(_ value: String) -> Bool {
-        value.count <= 24 && !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
-    }
+    static func isValidCallsign(_ value: String) -> Bool { FieldJournal.isValidCallsign(value) }
 
     func setCallsign(_ value: String) throws {
-        guard isLoaded else { throw AppError.invalidState }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard Self.isValidCallsign(trimmed) else { throw AppError.invalidState }
-        let journal = FieldJournal(
-            annotations: annotations, media: media, reports: reports, ownPosition: ownPosition, callsign: trimmed)
-        try SecureFiles.write(JSONEncoder().encode(journal), to: files.journalURL)
-        callsign = trimmed
+        try commit { $0.callsign = value.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
     func deleteMedia(_ item: MediaItem) throws {
-        // Remove bytes before the index entry. On failure the entry remains retryable.
-        for name in [item.fileName, item.thumbnailName] {
-            let url = files.mediaDirectory.appendingPathComponent(name)
-            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        try commit { journal in
+            if let saved = journal.media.first(where: { $0.id == item.id }) {
+                journal.pendingDeletions =
+                    (journal.pendingDeletions ?? []) + AttachmentFile.files(for: saved)
+                journal.media.removeAll { $0.id == saved.id }
+            }
         }
-        try commit(annotations: annotations, media: media.filter { $0.id != item.id })
+        try finishDeletion()
+    }
+
+    private func finishDeletion() throws {
+        retryPendingDeletions()
+        if cleanupError != nil { throw AppError.attachmentCleanupPending }
+    }
+
+    /// Persist intent first. A crash or locked-device failure can then resume
+    /// cleanup without deleting files still referenced by a saved report.
+    func retryPendingDeletions() {
+        guard isLoaded else { return }
+        do {
+            let pending = journal.pendingDeletions ?? []
+            if !pending.isEmpty {
+                for attachment in pending {
+                    let url = attachment.url(in: files)
+                    do {
+                        try FileManager.default.removeItem(at: url)
+                    } catch let error as NSError
+                        where error.domain == NSCocoaErrorDomain
+                        && error.code == NSFileNoSuchFileError
+                    {
+                        // A previous cleanup may have removed the file before a crash.
+                    }
+                }
+                try commit { $0.pendingDeletions = nil }
+            }
+            cleanupError = nil
+        } catch {
+            cleanupError = AppError.attachmentCleanupPending.localizedDescription
+        }
     }
 }

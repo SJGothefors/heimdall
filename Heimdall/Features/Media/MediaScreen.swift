@@ -3,12 +3,14 @@ import AVKit
 
 struct MediaScreen: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
     let store: LocalStore
     @State private var capture: CaptureMode?
     @State private var selected: MediaItem?
     @State private var saving = false
     @State private var requesting = false
     @State private var error: String?
+    @State private var captureRequest = UUID()
     enum CaptureMode: String, Identifiable { case photo, video; var id: String { rawValue } }
 
     var body: some View {
@@ -40,7 +42,8 @@ struct MediaScreen: View {
                                 Button { selected = item } label: {
                                     VStack(alignment: .leading, spacing: 8) {
                                         ZStack(alignment: .bottomTrailing) {
-                                            LocalThumbnail(url: store.files.mediaDirectory.appendingPathComponent(item.thumbnailName))
+                                            LocalPhoto(url: store.files.mediaDirectory.appendingPathComponent(item.thumbnailName),
+                                                maximumPixelSize: 500, contentMode: .fill)
                                                 .frame(height: 160).frame(maxWidth: .infinity).clipped()
                                             Image(systemName: item.kind == .photo ? "camera.fill" : "play.fill")
                                                 .font(.caption).padding(9).background(.black.opacity(0.6), in: Circle()).padding(8)
@@ -62,6 +65,10 @@ struct MediaScreen: View {
                     }.ignoresSafeArea()
                 }
                 .sheet(item: $selected) { item in MediaDetail(item: item, store: store) }
+                .onDisappear { captureRequest = UUID() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background { captureRequest = UUID() }
+                }
                 .alert("Camera & storage", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                     Button("OK", role: .cancel) { error = nil }
                 } message: { Text(error ?? "") }
@@ -82,11 +89,13 @@ struct MediaScreen: View {
     private func requestCapture(_ mode: CaptureMode) async {
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else { error = AppError.cameraUnavailable.localizedDescription; return }
         requesting = true
+        let request = captureRequest
         defer { requesting = false }
         guard await AVCaptureDevice.requestAccess(for: .video) else { error = "Allow camera access in iPhone Settings to capture media."; return }
         if mode == .video {
             guard await AVCaptureDevice.requestAccess(for: .audio) else { error = "Allow microphone access in iPhone Settings to record video with audio."; return }
         }
+        guard request == captureRequest, scenePhase == .active else { return }
         capture = mode
     }
 
@@ -109,21 +118,12 @@ struct MediaScreen: View {
     }
 }
 
-struct LocalThumbnail: View {
-    let url: URL
-    @State private var image: UIImage?
-    var body: some View {
-        Group {
-            if let image { Image(uiImage: image).resizable().scaledToFill() }
-            else { Rectangle().fill(Theme.panel).overlay { Image(systemName: "photo").foregroundStyle(Theme.muted) } }
-        }.task(id: url) { image = UIImage(contentsOfFile: url.path) }
-    }
-}
-
 struct MediaDetail: View {
     let item: MediaItem
     let store: LocalStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.displayScale) private var displayScale
     @State private var player: AVPlayer?
     @State private var confirmDelete = false
     @State private var error: String?
@@ -133,9 +133,13 @@ struct MediaDetail: View {
             VStack(spacing: 20) {
                 if item.kind == .video {
                     VideoPlayer(player: player).onAppear { player = AVPlayer(url: url) }.onDisappear { player?.pause(); player = nil }
-                } else if let image = UIImage(contentsOfFile: url.path) {
-                    Image(uiImage: image).resizable().scaledToFit()
-                } else { ContentUnavailableView("File unavailable", systemImage: "photo.badge.exclamationmark") }
+                } else {
+                    GeometryReader { geometry in
+                        LocalPhoto(url: url, maximumPixelSize: min(4096, max(1,
+                            Int(ceil(max(geometry.size.width, geometry.size.height) * displayScale)))))
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
+                }
                 Text(item.createdAt, format: .dateTime.day().month().year().hour().minute()).font(.caption).foregroundStyle(Theme.muted)
                 Text(ByteCountFormatter.string(fromByteCount: item.byteCount, countStyle: .file)).font(.caption).foregroundStyle(Theme.muted)
                 Button("Delete from device", role: .destructive) { confirmDelete = true }.padding(.bottom)
@@ -143,6 +147,9 @@ struct MediaDetail: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.background)
                 .navigationTitle(item.kind == .photo ? "Photo" : "Video").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase != .active { player?.pause() }
+                }
                 .confirmationDialog("Delete this file?", isPresented: $confirmDelete, titleVisibility: .visible) {
                     Button("Delete", role: .destructive) {
                         do { player?.pause(); try store.deleteMedia(item); dismiss() } catch { self.error = error.localizedDescription }

@@ -115,6 +115,7 @@ final class HeimdallUITests: XCTestCase {
         app.launchArguments.removeAll { $0 == "--reset-ui-tests" }
         app.launch()
         XCTAssertTrue(app.buttons["Layers"].waitForExistence(timeout: 15))
+        capture("Saved point after relaunch")
         app.buttons["Layers"].tap()
         app.staticTexts["UI test point"].firstMatch.tap()
         XCTAssertEqual(app.textFields["annotation-name"].value as? String, "UI test point")

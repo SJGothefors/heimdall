@@ -1,43 +1,65 @@
-# Security design and boundaries
+# Security and data safety
 
-Heimdall is a development implementation, not an independently audited or accredited military system.
+Heimdall is a prototype, not an audited or accredited secure communications system. It reduces common disclosure risks by keeping data local and using iOS protection. **It cannot guarantee that a hostile force with a captured, unlocked or compromised phone cannot read the data.** There is also no guarantee against all data loss.
 
-## Implemented
+The useful boundary is specific: the app does not need a server to show maps, save notes, capture media or play recordings. Stored information relies on the phone's passcode, iOS Data Protection and the application sandbox. Authentication inside the app is an additional access gate, not a separate encryption key.
 
-- All map styles, fonts and sources resolve to app-owned local files. MapLibre has networking capability, but its session is ephemeral, has no disk URL cache, and rejects HTTP/HTTPS using an installed URLProtocol. No remote style, telemetry SDK, accounts or cloud containers are used. No background modes are requested.
-- SpeechAnalyzer/DictationTranscriber performs on-device transcription. An explicit Device settings action downloads Apple language models while connected; recording and transcription do not upload audio or fall back to a cloud recognizer. Speech hardware/language availability must be checked on the target phone.
-- Authentication uses `LAContext` with device-owner authentication (biometric or device passcode). A passcode is required. Backgrounding locks the UI; re-entry requires authentication. A manual lock stops location updates.
-- Files and directories use `NSFileProtectionComplete`; the app also declares complete protection as its default data-protection entitlement. JSON writes use atomic replacement and complete file protection. Media and map-import staging directories are protected.
-- The entire private Application Support directory, imported maps, journal, media, voice recordings, thumbnails and staging files are explicitly excluded from backups.
-- A privacy window above presented content obscures app-switcher snapshots and app UI while the scene is inactive or captured. Screen recording/mirroring locks the app. This does not prevent screenshots, already-captured frames or a separate camera photographing the screen.
-- Photos are redrawn and JPEG-encoded without copying source EXIF/GPS. Video exports explicitly omit container metadata. Photo/video capture does not add a capture coordinate to the journal. **Voice reports do retain recording time and an optional GPS/manual position snapshot**, including the position timestamp and accuracy when available. Verify video metadata on the physical-device OS version before deployment; device-generated temporary assets are initially owned by the system camera workflow.
-- Photos and videos stay in the app sandbox. There is no automatic save to Photos, sharing action, clipboard export or transmission. Reports are displayed for the user to read over a separate radio.
-- Third-party keyboard extensions are disabled by the application delegate. Report and transcript fields also disable autocorrection. The system keyboard, dictation and OS services remain controlled by iOS and device settings.
-- GPS is off by default, requested only while in use, stops on lock/background and is not retained as tracks. Manual own-position is persisted until cleared. Voice recordings retain a position snapshot; clearing the current marker does not remove historical report metadata. Old or invalid fixes are not displayed as current positions. Core Location is an OS service and may use available system location sources; Heimdall does not control the phone's radios.
-- Region ZIPs are restricted by filenames, entry types, decompressed size, valid bounds, CRC/SHA-256 and PMTiles header checks. Extraction streams bounded chunks into protected staging, rejecting traversal and symlinks. No executable package content is accepted. Existing data is not overwritten on validation failure.
-- Journal updates are written before publishing new UI state. Decode failure blocks writing and preserves the original file.
-- The operator callsign is stored in that protected, backup-excluded journal, not in UserDefaults or source code. It is used only as the local position marker's label and is not transmitted.
+## What offline means here
 
-## Limits that matter
+| Activity | Network behavior |
+| --- | --- |
+| Maps, reports, annotations, media and playback | Local files; no app upload or sync implementation |
+| Map rendering | App-owned local styles, glyphs and sources; MapLibre's ephemeral URL session rejects HTTP/HTTPS and has no cache, cookies or credentials |
+| Voice transcription | Installed on-device speech models; missing/unsupported models produce an error, with no cloud recognizer fallback |
+| Prepare language in Device settings | Explicitly asks Apple's system service to download a model; do this before going offline |
+| Import a ZIP | Reads the selected file; a cloud document provider may itself download it |
+| Preparing a development build | Map-preparation scripts and initial Swift package resolution use the internet |
 
-- iOS protects files against locked-device access. This is not end-to-end encryption, per-document key separation, or protection against a compromised/unlocked phone, malicious keyboard, kernel exploit, coerced authentication or forensic access to an already unlocked device.
-- File deletion and atomic JSON replacement are ordinary filesystem operations. They do not guarantee forensic secure erasure on flash storage. There is no panic wipe or remote wipe feature.
-- Disabling app network code does not disable iOS radios, assisted location services, screenshot/keyboard services or a cloud document provider selected by the user. Provision maps under **On My iPhone** for offline import and configure the actual phone for the intended environment.
-- Capture may be interrupted by locking, low storage, phone calls or process termination. Voice capture stops and attempts to save on background/interruption; a process kill or storage failure can leave an orphan recording or incomplete audio. Keep the app open until it confirms the saved item in the vault. Temporary capture/export data can exist before completion; protected staging files are removed on the next successful journal load. Crash leftovers outside that staging directory may require app-container cleanup.
-- The Apple camera picker does not publish a reliable guarantee about all its internally managed temporary file lifetimes. A hardened production build should use a fully owned AVFoundation capture pipeline, verify metadata and temporary files under interruption, and receive a separate security review.
-- The journal is a bounded in-memory JSON store suitable for a small notebook. It has no concurrent writer, sync or recovery protocol. Retained media may fill the phone; file failures are reported, but automatic retention and a storage budget are not implemented.
-- The app hides its sensitive UI when locked but does not promise that previously loaded objects have been zeroed out of RAM.
-- `--ui-testing` bypasses authentication only in Debug **simulator** builds. The preprocessor excludes this path on physical devices and in Release. Test fixtures must never be operational data.
-- Map packs are not signed. Regional OSM vectors are dated 2026-09-24; the nationwide photo/elevation remain historical overview data. The app cannot establish truth, currency or trustworthiness of map content or observations.
+No account, analytics SDK, cloud container or background mode is configured. These are properties of this implementation, not a phone-wide network ban. The MapLibre protocol does not intercept arbitrary sockets, other libraries, system dictation, Core Location or other apps. Dependencies and OS behavior still need verification on the deployed build.
 
-## Before operational use
+Before offline testing, install the app and required speech models, put import packages under **On My iPhone**, then enable airplane mode and check Wi-Fi and Bluetooth separately. Verify the actual radio state required by your environment. The app cannot disable the phone's radios or promise radio silence. Use [physical-device testing](TESTING.md) to check behavior and observe network traffic independently.
 
-Use the physical-device checks in `TESTING.md`, independent application/device security review, up-to-date licensed cartography, a deployment/signing policy, and an explicit data handling and retention policy. This build does not claim TAK interoperability, validated navigation, assured GNSS accuracy, or military symbology compliance.
+Apple documents the on-device speech APIs in [SpeechAnalyzer](https://developer.apple.com/videos/play/wwdc2025/277/) and [DictationTranscriber](https://developer.apple.com/documentation/speech/dictationtranscriber).
 
-## Repository hygiene
+## Access and protection at rest
 
-The source does not require API keys, signing private keys, or device passcodes. Runtime journals and media live in the iPhone/simulator's private app container, outside this repository. The bundled maps use public source data.
+- `DeviceSecurity` requires device-owner authentication: biometrics or device passcode. A passcode must be configured. Backgrounding, manual lock and detected screen recording/mirroring lock the app. The Debug preview bypass is compiled only for simulators, never for physical phones or Release.
+- `SecureFiles` creates app-managed storage with `NSFileProtectionComplete`. The default data-protection entitlement requests the same class. Apple ties this protection to the device passcode and device hardware, and makes protected file data unavailable after device locking; see [Data Protection classes](https://support.apple.com/guide/security/data-protection-classes-secb010e978a/web).
+- The app marks its private data root, journal, attachments, map copies and staging files as excluded from backup. Replacement files receive these attributes before publication. Apple's [backup exclusion API](https://developer.apple.com/documentation/foundation/urlresourcekey/isexcludedfrombackupkey) describes this flag; verify its effect in an actual test backup.
+- There is no app-specific encryption password, per-report key or end-to-end encryption scheme. Pressing **Lock now** hides the app and stops location; it does not lock iOS or purge already loaded data from memory.
 
-Keep operational reports, coordinates, media, and restricted map packs out of Git, including test fixtures and screenshots. If app data must be copied into the workspace for local debugging, use the ignored root `LocalData/` directory. `.gitignore` also excludes environment files, signing keys, app-container exports, test results, archives, and journals. Ignore rules do not protect already tracked files or detect secrets pasted into source code.
+An unlocked device, OS compromise, forensic exploit, coerced authentication or someone photographing the screen remains outside this protection. Protection attributes in a simulator are not proof of encryption on a physical phone.
 
-Git commits also contain author and committer identities. Use a [GitHub noreply email](https://docs.github.com/en/account-and-profile/how-tos/email-preferences/setting-your-commit-email-address) if you do not want a personal or work email published. Changing the email for future commits does not change existing history.
+## What information stays on the phone
+
+The journal contains report text, transcripts, annotation coordinates, callsign, manual position and attachment metadata. Photo/video entries retain capture time and file size, but do not add a capture coordinate. Photos are redrawn without source EXIF/GPS; video export omits copied container metadata. The image or audio content itself can still reveal places, people, callsigns and other sensitive details. Inspect exported video metadata with synthetic footage on the target OS.
+
+Voice reports retain recording time and, when available, a GPS/manual position snapshot with its timestamp and accuracy. Clearing the current manual marker does not remove those historical snapshots. GPS is opt-in, foreground-only, stops on lock/background and has no continuous track log. Core Location may use OS-provided location sources. A stale or invalid fix is not presented as a current GPS position.
+
+The private vault does not save captures to Photos. There is no dedicated share/export/upload action. **Editable text can still be copied through the system editing menu, and transcripts and map source text are selectable.** Copied text leaves the app's protection boundary and may be available through system clipboard features. Disabling third-party keyboards and autocorrection does not disable system dictation, clipboard access or all OS text services. Configure the device accordingly; the app cannot promise those services never disclose input.
+
+A separate privacy window covers app-switcher snapshots, inactive scenes and detected screen recording/mirroring, including presented sheets. It cannot prevent screenshots, frames captured before detection or a separate camera. Screenshots belong to the system Photos workflow and may sync according to device settings.
+
+## Saving, failure and recovery
+
+Journal changes validate and save before the UI reports success. The replacement file is fully written, protected and synchronized before an atomic rename. If that save fails, the previous journal and published state remain. Invalid or unsupported journals are preserved and cannot be silently overwritten. These checks reduce partial-write and validation failures; they are not a storage-hardware guarantee.
+
+Attachment deletion commits its intent before removing bytes. If interrupted, the saved queue resumes after relaunch. A cleanup failure displays a warning and offers retry in Device settings. Until cleanup succeeds, deleted attachments may remain in protected storage. Ordinary deletion and replacement **do not guarantee forensic erasure on flash storage**. There is no panic-wipe or remote-wipe feature.
+
+Capture and journal updates are not one atomic operation. Low storage, process termination, device locking or camera/audio interruption can leave incomplete or unindexed files. Voice recording attempts to finish on background/interruption and offers retry after a report-save failure while the capture view remains alive. Keep the app open until it confirms the saved entry, then reopen/play it. Unsaved editors and drawings are temporary.
+
+Staging is cleaned after a successful journal load. Unknown media/voice files are not automatically deleted because they may be the only surviving capture. There is no in-app orphan recovery tool. System camera temporary files are outside the app's fully controlled capture pipeline; a production hardening effort should replace the picker with an owned AVFoundation pipeline and test interruption/metadata handling.
+
+**Backup exclusion trades recovery for reduced replication.** Losing or damaging the phone, deleting the app, forgetting its passcode or losing access to the device can lose the only copy. There is no supported export/restore workflow, automatic backup, rollback journal or sync replica. Atomic writes do not change that. Do not delete/reinstall the app to troubleshoot a journal error; preserve the container for an authorized recovery review.
+
+## Imported maps and dependencies
+
+ZIP imports allow only the defined regular files. Compressed copying and extraction are bounded; traversal, symlinks, duplicate entries, oversized content, invalid bounds, CRC/hash mismatches and invalid PMTiles headers are rejected. The app validates a private snapshot and keeps those exact bytes. Imported content cannot supply a style or remote resource URL.
+
+SHA-256 checks establish agreement with the included manifest, **not who produced it**. An attacker can replace a map and its manifest together. Packs are unsigned, internal tiles still reach third-party parsers, and a structurally valid map can be false or outdated. Only use sources trusted for the intended task. Pinned dependencies help reproducibility but do not prove the absence of vulnerabilities.
+
+## Before sensitive use
+
+Complete the physical-device checks in [Testing](TESTING.md), have the signed build and device configuration independently reviewed, and decide how data should be retained or recovered. This prototype has not established resistance to an adversary with forensic capabilities. It is also not validated for navigation, GNSS accuracy, TAK interoperability or military symbology compliance.
+
+Keep operational data out of Git, test results and screenshots. The ignored `LocalData/` directory is for authorized local debugging copies; ignore rules are neither encryption nor secret detection and do not untrack existing files. Builds require no API keys or committed signing material. Git history also records author/committer identities independently of app data.

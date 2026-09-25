@@ -165,7 +165,8 @@ struct MapScreen: View {
                         OfflineVectorMap(
                             maps: maps, photoMode: style == .photo, showRegionBorders: showRegionBorders,
                             viewport: $viewport,
-                            annotations: visibleAnnotations, draft: draft, activeLayer: activeLayer,
+                            annotations: store.annotations, visibleLayers: visibleLayers, draft: draft,
+                            activeLayer: activeLayer,
                             location: location.currentPosition, callsign: store.callsign, onTap: mapTapped
                         )
                         .id("\(maps.revision)-\(style.rawValue)")

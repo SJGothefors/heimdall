@@ -9,13 +9,5 @@ struct MediaItem: Identifiable, Codable, Equatable, Sendable {
     // Filenames are derived from UUIDs, never accepted from imported content.
     var fileName: String { id.uuidString + (kind == .photo ? ".jpg" : ".mov") }
     var thumbnailName: String { id.uuidString + "-thumb.jpg" }
-}
-
-struct FieldJournal: Codable {
-    var version = 1
-    var annotations: [MapAnnotation] = []
-    var media: [MediaItem] = []
-    var reports: [SevenSReport] = []
-    var ownPosition: PositionSnapshot?
-    var callsign: String?
+    var isValid: Bool { byteCount > 0 && createdAt.timeIntervalSince1970.isFinite }
 }

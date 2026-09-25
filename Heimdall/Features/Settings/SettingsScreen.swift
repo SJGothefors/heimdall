@@ -97,6 +97,10 @@ struct SettingsScreen: View {
                     )
                 }
                 Section("Protection") {
+                    if let message = store.cleanupError {
+                        Text(message).font(.caption).foregroundStyle(.orange)
+                        Button("Retry file cleanup") { store.retryPendingDeletions() }
+                    }
                     Button("Lock now", systemImage: "lock") {
                         location.stop()
                         security.lock()

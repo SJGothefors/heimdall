@@ -1,55 +1,69 @@
-# Validation
+# Testing
 
-## Current validation — 2026-09-25
+Use synthetic reports, positions and media. Keep result bundles, app-container copies and screenshots out of Git. Unit tests use temporary roots; the test host and UI tests use the separate `HeimdallUITests` app-data directory. UI tests reset only that directory. Normal app launches do not seed observations or clear the notebook.
 
-Xcode 27.0 / iOS 27.0 SDK, iPhone 18 Pro simulator, Swift 6 strict concurrency.
+## Run locally
 
-- Unit/integration suite: **18 passed, 1 physical-device-only skipped** in `build/CallsignLayout.xcresult`. Covers callsign save/clear/validation without losing field data, older journals without a callsign, independent MGRS reference values, fit-to-country bounds, manual-position and voice persistence/deletion, preconfigured Gotland, two-region loading/relaunch/archiving, third-region rejection and malicious ZIP inputs.
-- UI suite: **6 checks passed across the full run and targeted rerun**, covering portrait and both landscape orientations, detailed map modes/drawing, annotation persistence, background locking, report lifecycle, callsign editing and position/voice capture/playback, and the two-region coverage toggle. Five passed in `build/CallsignLayout.xcresult`; the callsign/voice check passed in `build/CallsignVerified.xcresult` after correcting the test's lookup of a combined accessibility label. No application fix was needed for that assertion.
-- Full-screen captures were visually checked for the callsign beside the blue position marker, coordinates on the top control row, bottom buttons above the home gesture area, map behind safe areas, centered crosshair and reachable controls. Photo resolution is unchanged pending aerial data access; see [Data sources](DATA_SOURCES.md#detailed-aerial-imagery--not-yet-included).
-- Unsigned physical-device **Release build succeeds** with minimum OS 27.0. The binary excludes all simulator preview/reset arguments and includes all five offline packages.
-- Each regional archive's manifest and extracted PMTiles SHA-256 matches `Scripts/regions.json`. The map preparation command and generated project are checked. `git diff --check` and property-list validation pass.
-- UI tests use a separate simulator data directory and synthetic observations. They do not reset the ordinary app's notebook. Screenshots are full-screen XCTest captures to avoid incorrect app-window crops after rotation.
+With Xcode 27, the five prepared region ZIPs and an iOS 27 simulator installed:
 
-Simulator checks do **not** validate real camera/GNSS performance, Swedish/English transcription accuracy, locked-device encryption, thermal/battery behavior or operation in field conditions. Language models were not downloaded during the UI tests; the offline-unavailable path preserves the recording.
+```sh
+xcodebuild -project Heimdall.xcodeproj -scheme Heimdall \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+  -collect-test-diagnostics never -parallel-testing-enabled NO \
+  -resultBundlePath build/TestRun.xcresult test
+```
 
-## Automated
+Use a new result-bundle name each time. Add `-only-testing:HeimdallTests` for unit/integration tests or `-only-testing:HeimdallUITests` for UI tests. Once packages are resolved, `-disableAutomaticPackageResolution` prevents automatic version resolution; required package artifacts must already be cached.
 
-Run the shared Heimdall scheme's tests on an iOS 27 simulator. The test suite covers:
+For an unsigned physical-device Release build:
 
-- Forward/inverse Web Mercator, country fitting and independently generated MGRS reference values.
-- Bundled vector, photo and elevation package availability and validation.
-- Invalid, incomplete and out-of-coverage annotations.
-- 7S save/edit/sent/delete persistence across store reloads; explicit missing-field text and limits.
-- Corrupt journal preservation and refusal to overwrite.
-- Independent tactical layers and iOS file-protection/backup attributes.
-- Symlink import rejection and unsafe elevation dimensions.
-- Photo persistence, thumbnail creation and deletion.
-- UI map-mode switching, point creation, relaunch persistence and deletion.
-- UI 7S creation, radio-text reading, marking sent and deletion.
-- UI background lock and explicit unlock on return.
-- Complete map-import/replacement/failure/restore lifecycle.
+```sh
+xcodebuild -project Heimdall.xcodeproj -scheme Heimdall \
+  -configuration Release -destination 'generic/platform=iOS' \
+  -derivedDataPath build/DeviceRelease CODE_SIGNING_ALLOWED=NO build
+```
 
-## Physical iPhone acceptance (required separately)
+Building is not the same as installing or testing on a physical phone.
 
-1. Install a signed Release build on iOS 27 with a passcode. Cold launch and authenticate. Repeat with Face ID unavailable and use the passcode. Check that removing the device passcode prevents a new unlock.
-2. Enable airplane mode and disable Wi-Fi. Terminate/relaunch the app. Verify vector, photo and 3D maps without prior app network access. Repeat after reboot/unlock.
-3. Add one point, line and area to each layer. Pan/zoom; verify geometric alignment in Photo and 3D. Toggle visibility, relaunch and verify persistence. Check imported regional coverage and handling of invalid packs.
-4. Capture portrait/landscape photos, front/rear camera and audio/video. Wait for vault confirmation, relaunch and play them offline. Verify no Photos-library entries and inspect image/video metadata outside the operational device using dedicated test media.
-5. Test capture cancellation, denied camera/microphone access, low storage, interruption, locking and backgrounding during export. Confirm explicit failure handling and inspect the app sandbox for temporary/orphaned files.
-6. Enter Swedish 7S text, incomplete drafts and long fields. Cancel edits, save changes, reopen, mark sent, edit again (clears sent), delete, relaunch. Use VoiceOver and largest accessibility text sizes.
-7. Background from map, report editor, reader, media detail and active camera. Verify obscured app-switcher snapshots and authentication on return. Start screen recording/mirroring with sheets presented; verify the separate privacy window covers them. Check screenshot behavior is accurately documented.
-8. Verify data protection on a locked physical device and backup exclusion using a test backup. A simulator cannot establish the device's cryptographic protection.
-9. Check GPS outdoors with radios disabled; test denied, approximate and stale locations. GPS availability/accuracy is an environmental constraint. Verify updates stop on lock and background.
-10. Have a separate reviewer audit the signed Release app, provisioning, data paths, imported-map trust, temporary capture lifecycle and device configuration before field use.
+## Latest validation — 2026-09-25
 
-Use synthetic observations for testing. The app deliberately does not ship sample tactical positions or fictional report content in normal use.
+Xcode 27.0, Swift 6 strict concurrency, iPhone 18 Pro simulator on iOS 27.0.
 
-## Added device checks for regions and voice
+- Unit/integration suite: **38 passed, 1 physical-device-only skipped**, including storage failure and rendering checks, in `build/PerformanceUnit.xcresult`.
+- UI suite: **6 workflows passed in one run**, in `build/PerformanceUI.xcresult`: background locking, voice/position, point persistence, rotation/map modes, report handling and region loading/coverage.
+- Final rendering suite and point/rotation workflows also pass in `build/PerformanceFinal.xcresult` after the drawing-visibility adjustment. Exported synthetic screenshots were reviewed for maps, position labels and terrain.
+- Unsigned physical-device **Release build succeeds**. Its binary excludes the simulator authentication/reset arguments, targets iOS 27 and contains all five region ZIPs.
+- Project regeneration is deterministic; Python syntax, local documentation links, property lists and `git diff --check` pass. The new/reworked storage, policy and rendering files pass `swift-format` lint.
 
-1. Install both Swedish and English speech models using Device → Offline speech while connected. Enable airplane mode, record known phrases in each language, transcribe and compare against the recordings. Check an unsupported language/device and a missing/evicted model: keep the audio and manual editor available, with no cloud fallback.
-2. Start with Gotland, load Stockholm, archive Gotland, then load Uppland. Pan across the Stockholm/Uppland overlap at street level. Relaunch offline and confirm both remain loaded. Attempt a third region and verify that nothing is silently removed.
-3. Check all five regional extracts near their declared edges, the country overview outside them, and coverage outlines on/off in Vector, Photo and 3D. Package boundaries are rectangular data extents, not province borders.
-4. Record with GPS off/no manual fix, a current GPS fix, and an old manual position. Confirm time, source, MGRS coordinate, position age and GPS accuracy. Location metadata must never silently become the observed object's Ställe.
-5. Interrupt recording with a call, lock, background, route change and low storage; verify saved audio and duration. Kill the process mid-recording to assess partial/orphan data. Retry a failed save. Delete a report and confirm its audio file is removed.
-6. Play, pause, scrub and leave a recording screen. Cancel transcription and background while transcribing. Confirm audio stops, the privacy shield covers the UI and the app requires authentication on return.
+Xcode still reports an AVAudioSession main-thread warning during voice capture; the terrain UI run also reported a thread-priority warning. The recorder already uses asynchronous session activation/deactivation. These diagnostics still need device profiling. Passing functional tests do not establish responsiveness under load; see [Performance](PERFORMANCE.md) for the focused measurements and profiling workload.
+
+Rendering tests check independent saved-object/draft/position updates, unchanged-frame reuse, native geometry and labels, map style sources, terrain mesh/material/camera preservation, and bounded photo decoding with orientation, cancellation and unchanged originals. The benchmark uses 2,000 synthetic points and prints both the former and current preparation times; it does not assert a machine-specific timing threshold.
+
+The new tests exercise real filesystem failure during journal replacement, attachment preservation after failed saves, interrupted deletion recovery, unreadable/oversized journals, visible cleanup failure and retry, old journals, invalid media/shared recording rejection, backup exclusion after replacement, invalid bounds, local map-style resources, HTTP/HTTPS rejection through the configured URL session, and imported ZIP snapshot consistency.
+
+The existing suites cover MGRS reference coordinates, projection and country fitting, annotations and layers, report persistence/edit/sent/delete, corrupt journals, media thumbnails, two-region loading/archiving/relaunch, malicious ZIP fixtures, navigation, rotation, callsign editing, voice capture/playback and background locking.
+
+A passing URL-session test proves the configured interception path rejects a request. It is **not** a packet capture of every framework or OS service. Simulator testing does not validate locked-device cryptography, real camera/GNSS behavior, battery/thermal limits, speech accuracy or forensic resistance. Speech models are not prepared automatically during tests; the missing-model path must preserve audio.
+
+## Physical-device acceptance
+
+Run these checks on a signed Release build, with synthetic data, before considering sensitive use. Record the app build, iPhone model, OS version, steps and results. Repeat relevant checks after changing OS versions, capture code, storage or dependencies.
+
+| Area | Check |
+| --- | --- |
+| Authentication | Cold launch with passcode; test biometrics and passcode fallback, manual lock, background/re-entry, and removal of the device passcode. Confirm simulator bypass arguments have no effect. |
+| Offline operation | Install/prepare everything, enable airplane mode, disable Wi-Fi and verify Bluetooth state. Reboot, unlock and relaunch. Load both regions, write/read reports, capture/play media and use supported transcription without connectivity. |
+| Network observation | Observe device traffic independently while exercising maps, reports, capture and transcription with synthetic data. Distinguish app traffic from OS traffic. Test language preparation separately as the deliberate online action. |
+| Maps | Load two regions, attempt a third, archive one and relaunch. Check overlap, edges and coverage outlines in all modes. Import malformed ZIPs and confirm existing maps and reports survive. |
+| Annotations/reports | Save/edit/delete points, lines, areas and incomplete 7S reports; relaunch after each. Verify marked-sent behavior, long fields, rotation, VoiceOver and large accessibility text. Check what happens to unsaved edits on lock/background. |
+| Camera/vault | Test portrait/landscape, front/rear photo, video with audio, cancellation and denied permissions. Wait for confirmation, relaunch and play. Confirm no Photos entry; inspect photo/video metadata using dedicated test captures. |
+| Voice/speech | Prepare Swedish and English explicitly, then transcribe known phrases offline. Check absent/evicted models and unsupported devices/languages. Confirm recordings and manual editing remain available and location metadata never silently becomes Ställe. |
+| Interruptions/storage | Background, lock, interrupt with a call, change audio route and run low on storage during capture/export/save/delete. Confirm errors, playback stopping and deletion retries. Kill mid-recording; inspect partial/orphan files and staging in a test container. |
+| Position | Test GPS off, manual position, current GPS, denied/approximate/stale fixes and outdoor operation with radios disabled. Check timestamps/accuracy, no background updates, and historical snapshots remaining after the current marker is cleared. |
+| Screen privacy | Background with each sheet and camera open. Inspect app-switcher snapshots. Start recording/mirroring before and during use; verify the shield covers presented content. Confirm the documented screenshot and clipboard limits. |
+| File protection/backups | Verify protected files become inaccessible on a locked physical phone. Inspect a test backup for exclusion of the journal, attachments, maps and staging; check attributes after replacement and interruption. |
+
+Deletion is ordinary filesystem removal, not secure erasure. Do not interpret an empty vault or successful delete test as proof that flash data is unrecoverable. Testing also cannot establish the trustworthiness or accuracy of imported map content.
+
+An independent review of the signed app, dependencies, device configuration and data-handling policy remains necessary for adversarial use. See [Security](SECURITY.md) for the boundaries these tests are intended to check.
